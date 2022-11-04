@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractproperty
 
 from src.entities.interfaces.dataset import DatasetInterface
 from src.entities.interfaces.feature_selection import FeatureSelectionInterface
@@ -15,3 +15,7 @@ class Run(ABC):
         self.model = model
         self.feature_selector = feature_selector
         self.dataset = dataset
+
+    @abstractproperty
+    def run(self) -> dict:
+        pass
