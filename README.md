@@ -24,7 +24,7 @@ CHOWDHURY, A. S., DOUGLAS, R. C., SHIRA L. B. Antimicrobial Resistance Predictio
 MECESIC, Nenad Predicting Phenotypic Polymyxin Resistance in Klebsiella. mSystems, 2020.
 
 NGUYEN, Marcus Developing an in silico minimum inhibitory concentration panel test for Klebsiella pneumonia. Scientific Reports, 2020.
-MORRISON, L., & ZEMBOWER, T. R. Antimicrobial Resistance. Gastrointestinal Endoscopy Clinics of North America, 2020. 
+MORRISON, L., & ZEMBOWER, T. R. Antimicrobial Resistance. Gastrointestinal Endoscopy Clinics of North America, 2020.
 SHORR, A. F. Review of studies of the impact on Gram-negative bacterial resistance on outcomes in the intensive care unit. Critical Care Medicine, 2009.
 
 INFOGRAPHIC: Antibiotic resistance - an increasing threat to human health. European Centers for Disease Control and Prevention. Available in: https://www.who.int/news-room/fact-sheets/detail/antimicrobial-resistance. Access in: 24/07/2021.
@@ -34,3 +34,15 @@ TACCONELLI, E. Global Priority List of Antibiotic-Resistant Bacteria to Guide Re
 JORGENSEN, J. H., & FERRARO, M. J. Antimicrobial susceptibility testing: A review of general principles and contemporary practices. Clinical Infectious Diseases, 2009.
 
 BIGGEST Threats and Data. Centers for Disease Control and Prevention. Available in: https://www.cdc.gov/drugresistance/biggest-threats.html. Access in:: 24/07/2021.
+
+## Project Requirements
+
+1. Python > 3.9
+2. sra-toolkit
+3. Jellyfish
+4. fastq_to_fasta
+
+### sra-toolkit
+
+Sra toolkit will hep us fetch data directly from the NCBI database.
+To instal this requirements we must follow the [sra-toolkit documentation](https://github.com/ncbi/sra-tools/wiki/02.-Installing-SRA-Toolkit).
