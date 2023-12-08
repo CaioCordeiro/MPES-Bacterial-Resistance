@@ -1,9 +1,12 @@
 import os
 import csv
 import pandas as pd
-from core.utils import create_folder, write_csv_file, normalize_mic
+from utils import create_folder, write_csv_file, normalize_mic
 from datetime import datetime
-from config import Config
+
+ANTIBIOTIC_LIST = ['Amikacin', 'Ampicillin', 'Ampicillin/Sulbactam', 'Aztreonam', 'Cefazolin', 'Cefepime', 'Cefoxitin', 'Ceftazidime', 'Ceftriaxone', 'Cefuroxime sodium',
+                   'Ciprofloxacin', 'Gentamicin', 'Imipenem', 'Levofloxacin', 'Meropenem', 'Nitrofurantoin', 'Piperacillin/Tazobactam', 'Tetracycline', 'Tobramycin', 'Trimethoprim/Sulfamethoxazole', 'Vancomycin']
+
 
 FILE_DIR = 'data/features'
 OUTPUT_DIR = 'data/datasets'
@@ -42,7 +45,7 @@ def get_data_from_antibiotic_file(seq_name: str):
 
     # GET ORDERED MIC
     mic_list = [normalize_mic(actual_mic[antibiotic]) if antibiotic in actual_mic else 0.0
-                for antibiotic in Config.ANTIBIOTIC_LIST]
+                for antibiotic in ANTIBIOTIC_LIST]
 
     return mic_list
 

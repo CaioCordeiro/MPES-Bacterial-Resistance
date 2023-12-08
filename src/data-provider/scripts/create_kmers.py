@@ -1,30 +1,28 @@
 import os
 import time
-import json
-
-from core.utils import create_folder, write_csv_file
-from config import Config
-
+import os
+from utils import create_folder, write_csv_file
 K_SIZE = 5
 
-FILE_DIR = 'data/fasta_files'
+FILE_DIR = 'data/fasta_data'
 OUTPUT_DIR = 'data/features'
 
-COMMAND_GET_KMERS = f"jellyfish count -m {K_SIZE} -s 10000M -t 10 data/fasta_files/<seq_name>.fasta -o data/kmer_counter/<seq_name>.jf"
+COMMAND_GET_KMERS = f"jellyfish count -m {K_SIZE} -s 10000M -t 10 {FILE_DIR}/<seq_name>/<seq_name>.fasta -o data/kmer_counter/<seq_name>.jf"
 COMMAND_DUMP_DATA = "jellyfish dump data/kmer_counter/<seq_name>.jf > data/kmer_counter/<seq_name>.fa"
 
+EXCLUDE_LIST = []
 
 def main():
-    file_list = os.listdir("data/fasta_files")
+    file_list = os.listdir("data/fasta_data")
 
     create_folder("data/kmer_counter")
     create_folder(OUTPUT_DIR)
 
     for file_name in file_list:
-        sra_id = file_name.replace(".fasta", "")
+        sra_id = file_name
         print("RUNNING FOR SEQ: ", sra_id)
 
-        if sra_id in Config.EXCLUDE_LIST:
+        if sra_id in EXCLUDE_LIST:
             continue
 
         output_dict = {}
