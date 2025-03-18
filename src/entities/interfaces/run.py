@@ -8,8 +8,14 @@ from src.entities.interfaces.model import ModelInterface
 
 
 class Run(ABC):
-    def __init__(self, name: str, metric_provider: MetricsCalculatorInterface, model: ModelInterface,
-                 feature_selector: FeatureSelectionInterface, dataset: DatasetInterface):
+    def __init__(
+        self,
+        name: str,
+        metric_provider: MetricsCalculatorInterface,
+        model: ModelInterface,
+        feature_selector: FeatureSelectionInterface,
+        dataset: DatasetInterface,
+    ):
         self.name = name
         self.metric_provider = metric_provider
         self.model = model
