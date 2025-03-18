@@ -47,8 +47,26 @@ BIGGEST Threats and Data. Centers for Disease Control and Prevention. Available 
 Sra toolkit will hep us fetch data directly from the NCBI database.
 To instal this requirements we must follow the [sra-toolkit documentation](https://github.com/ncbi/sra-tools/wiki/02.-Installing-SRA-Toolkit).
 
+Remember to run:
+```bash
+export PATH=$PWD/sratoolkit.3.0.0-ubuntu64/bin:$PATH
+```
+OR
+
+Run:
+```bash
+sudo apt update
+sudo apt install sra-toolkit
+```
 
 ### Jellyfish
 
 Jellyfish is a multi-thread k-mere counter.
 To install this requirement we must follow the [Jellyfish Official Documentation](https://github.com/gmarcais/Jellyfish)
+OR
+
+Run:
+```bash
+sudo apt update
+sudo apt install jellyfish
+```
