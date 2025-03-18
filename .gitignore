@@ -129,6 +129,7 @@ dmypy.json
 .pyre/
 
 #Project specific files
+data/
 Scripts/*
 share/*
 .idea/*
