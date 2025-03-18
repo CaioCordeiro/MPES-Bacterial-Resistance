@@ -128,6 +128,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+#Project specific files
 Scripts/*
 share/*
 .idea/*
+
+*.tar*
+*.tmp*
