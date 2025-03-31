@@ -1,28 +1,38 @@
-import pandas as pd
 from typing import Any, List
+
+import pandas as pd
 from sklearn.model_selection import train_test_split
-from entities.interfaces.dataset import DatasetInterface
+
 from constants.constants import FILE_DIR
+from entities.interfaces.dataset import DatasetInterface
 
 FILE_MAP = {
-    'ac': {
-        'aac': 'Ac_Sa_Ca_Kl_Ec/aac_all.csv',
-        'bla': 'Ac_Sa_Ca_Kl_Ec/bla_all.csv',
-        'dfr': 'Ac_Sa_Ca_Kl_Ec/dfr_all.csv',
+    "ac": {
+        "aac": "Ac_Sa_Ca_Kl_Ec/aac_all.csv",
+        "bla": "Ac_Sa_Ca_Kl_Ec/bla_all.csv",
+        "dfr": "Ac_Sa_Ca_Kl_Ec/dfr_all.csv",
     },
-    'ps': {
-        'aac': 'Ps_Vb_En/aac_all.csv',
-        'bla': 'Ps_Vb_En/bla_all.csv',
-        'dfr': 'Ps_Vb_En/dfr_all.csv',
+    "ps": {
+        "aac": "Ps_Vb_En/aac_all.csv",
+        "bla": "Ps_Vb_En/bla_all.csv",
+        "dfr": "Ps_Vb_En/dfr_all.csv",
     },
 }
+
 
 class ProtainDataset(DatasetInterface):
     """
     A class to load, preprocess, and represent protein-related datasets,
     adhering to the DatasetInterface.
     """
-    def __init__(self, bac: str, ds_name: str, name: str = "ProtainDataset", metric_provider: Any = None):
+
+    def __init__(
+        self,
+        bac: str,
+        ds_name: str,
+        name: str = "ProtainDataset",
+        metric_provider: Any = None,
+    ):
         """
         Initializes the ProtainDataset.
 
@@ -45,13 +55,17 @@ class ProtainDataset(DatasetInterface):
             filepath = f"{self.filepath_config}/{FILE_MAP[bac][ds_name]}"
             return pd.read_csv(filepath)
         except Exception as err:
-            raise ValueError(f"Invalid bac: {bac} or ds_name: {ds_name}. \n Original error: \n {str(err)}")
+            raise ValueError(
+                f"Invalid bac: {bac} or ds_name: {ds_name}. \n Original error: \n {str(err)}"
+            )
 
     def _discretize(self, df: pd.DataFrame) -> pd.DataFrame:
         """Discretizes the numerical columns of the dataframe."""
         for i in df.columns:
             if i != "Feature" and i != "Output":
-                df[i] = pd.qcut(df[i], q=5, labels=False, precision=0, duplicates='drop')
+                df[i] = pd.qcut(
+                    df[i], q=5, labels=False, precision=0, duplicates="drop"
+                )
         return df
 
     def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -68,7 +82,9 @@ class ProtainDataset(DatasetInterface):
         """
         return self._treated_data
 
-    def splitted_dataset(self, test_size: float, random_state: int = None) -> List[pd.DataFrame]:
+    def splitted_dataset(
+        self, test_size: float, random_state: int = None
+    ) -> List[pd.DataFrame]:
         """
         Splits the treated protein dataset into training and testing sets.
 
@@ -81,7 +97,9 @@ class ProtainDataset(DatasetInterface):
         """
         if self._treated_data is None:
             raise ValueError("Treated data is not available.")
-        train_df, test_df = train_test_split(self._treated_data, test_size=test_size, random_state=random_state)
+        train_df, test_df = train_test_split(
+            self._treated_data, test_size=test_size, random_state=random_state
+        )
         return [train_df, test_df]
 
     @property

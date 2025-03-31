@@ -9,8 +9,8 @@ import pandas as pd
 from constants.constants import (ANTIBIOTIC_FILE, ANTIBIOTIC_LIST,
                                  DATASET_OUTPUT_DIR, FEATURE_DIR, K_SIZE)
 
-from .utils import (create_folder,  # Assuming these are in 'utils.py'
-                    normalize_mic, write_csv_file)
+from .utils import create_folder  # Assuming these are in 'utils.py'
+from .utils import normalize_mic, write_csv_file
 
 
 class DatasetGenerator:
@@ -26,6 +26,7 @@ class DatasetGenerator:
         antibiotic_file: str = ANTIBIOTIC_FILE,
         antibiotic_list: List[str] = None,
         k_size: int = K_SIZE,
+        bac_name: int = "kleb",
     ):
         """
         Initializes the DatasetGenerator.
@@ -38,9 +39,12 @@ class DatasetGenerator:
                              Defaults to the list defined in constants.py.
             k_size: The size of the k-mers used to generate the feature files.
         """
+        self.bac_name = bac_name
         self.feature_dir = feature_dir
         self.output_dir = output_dir
-        self.antibiotic_file = antibiotic_file
+        self.antibiotic_file = (
+            f"{antibiotic_file}/{self.bac_name}/antibotic_relation.csv"
+        )
         self.antibiotic_list = (
             antibiotic_list if antibiotic_list is not None else ANTIBIOTIC_LIST
         )
@@ -79,12 +83,9 @@ class DatasetGenerator:
         """
         if mic_columns is None:
             mic_columns = [
-                "genome",
                 "sra_id",
-                "patric_id",
                 "antibiotic",
                 "mic_actual",
-                "mic_predicted",
             ]
         try:
             csv_data = pd.read_csv(self.antibiotic_file, header=0, names=mic_columns)
@@ -93,14 +94,9 @@ class DatasetGenerator:
             ]
             sra_relation = sra_relation.set_index("antibiotic")
             actual_mic = sra_relation.to_dict()["mic_actual"]
-            mic_list = [
-                (
-                    normalize_mic(actual_mic[antibiotic])
-                    if antibiotic in actual_mic
-                    else 0.0
-                )
-                for antibiotic in self.antibiotic_list
-            ]
+            mic_list = []
+            for antibiotic in self.antibiotic_list:
+                mic_list.append(actual_mic.get(antibiotic.lower(), 0))
             print(f"MIC data for {seq_name}: {mic_list}")
             return mic_list
         except FileNotFoundError:
@@ -145,7 +141,7 @@ class DatasetGenerator:
         """
         file_list = os.listdir(self.feature_dir)
         seq_data: List[List] = []
-
+        print(file_list)
         for file_name in file_list:
             print("RUNNING FOR SEQ: ", file_name)
             sra_id = file_name.replace(".csv", "")

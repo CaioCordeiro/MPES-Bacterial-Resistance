@@ -8,5 +8,5 @@ class FeatureSelectionInterface(ABC):
         self.name = name
 
     @abstractmethod
-    def algorithmImplementation(self, data: DataFrame) -> DataFrame:
+    def fit(self, data: DataFrame) -> DataFrame:
         pass

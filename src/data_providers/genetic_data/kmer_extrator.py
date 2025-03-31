@@ -2,8 +2,8 @@ import os
 import time
 from typing import Dict, List
 
-from .utils import (create_folder,  # Assuming these are in a 'utils.py' file
-                    write_csv_file)
+from .utils import create_folder  # Assuming these are in a 'utils.py' file
+from .utils import write_csv_file
 
 
 class KmerExtractor:
@@ -19,6 +19,7 @@ class KmerExtractor:
         output_dir: str = "data/features",
         kmer_counter_dir: str = "data/kmer_counter",
         exclude_list: List[str] = [],
+        bac_name: str = "kleb",
     ):
         """
         Initializes the KmerExtractor with parameters for k-mer extraction.
@@ -30,10 +31,11 @@ class KmerExtractor:
             kmer_counter_dir: The directory used by Jellyfish for intermediate files.
             exclude_list: A list of SRA IDs to exclude from processing.
         """
+        self.bac_name = bac_name
         self.k_size = k_size
-        self.file_dir = file_dir
-        self.output_dir = output_dir
-        self.kmer_counter_dir = kmer_counter_dir
+        self.file_dir = file_dir + "/" + self.bac_name
+        self.output_dir = output_dir + "/" + self.bac_name
+        self.kmer_counter_dir = kmer_counter_dir + "/" + self.bac_name
         self.exclude_list = exclude_list
         self._command_get_kmers = f"jellyfish count -m {self.k_size} -s 10000M -t 10 {self.file_dir}/<seq_name>/<seq_name>.fasta -o {self.kmer_counter_dir}/<seq_name>.jf"
         self._command_dump_data = f"jellyfish dump -c {self.kmer_counter_dir}/<seq_name>.jf > {self.kmer_counter_dir}/<seq_name>.fa"

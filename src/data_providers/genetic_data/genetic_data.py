@@ -23,7 +23,7 @@ class GeneticDataset(DatasetInterface):
 
     def __init__(
         self,
-        sra_ids: List[str] = const.SRA_ID_LIST,
+        sra_ids: List[str] = const.SRA_ID_LIST_KLEB,
         exclude_ids: List[str] = const.EXCLUDE_LIST,
         raw_data_output: str = const.FILE_DIR,
         kmer_size: int = const.K_SIZE,
@@ -31,6 +31,7 @@ class GeneticDataset(DatasetInterface):
         dataset_output: str = const.DATASET_OUTPUT_DIR,
         name: str = "GeneticDataset",
         metric_provider=None,
+        bac_name: str = "kleb",
     ):
         """
         Initializes the GeneticDataset.
@@ -46,12 +47,13 @@ class GeneticDataset(DatasetInterface):
             metric_provider: Optional object to provide metrics.
         """
         super().__init__(raw_data=None, name=name, metric_provider=metric_provider)
+        self.bac_name = bac_name
         self.sra_ids = sra_ids
         self.exclude_ids = exclude_ids
-        self.raw_data_output_dir = raw_data_output
+        self.raw_data_output_dir = raw_data_output + "/" + self.bac_name
         self.kmer_size = kmer_size
-        self.feature_output_dir = feature_output
-        self.dataset_output_dir = dataset_output
+        self.feature_output_dir = feature_output + "/" + self.bac_name
+        self.dataset_output_dir = dataset_output + "/" + self.bac_name
         self._treated_data: DataFrame = None
         create_folder(self.raw_data_output_dir)
         create_folder(self.feature_output_dir)
@@ -65,7 +67,7 @@ class GeneticDataset(DatasetInterface):
         downloader = SraDownloader(
             sra_id_list=self.sra_ids,
             exclude_list=self.exclude_ids,
-            output_dir=self.raw_data_output_dir,
+            bac_name=self.bac_name,
         )
         downloader.download()
         print("Raw genetic data fetching finished.")
@@ -75,11 +77,7 @@ class GeneticDataset(DatasetInterface):
         Extracts k-mer features from the fetched raw genetic data and saves them to CSV files.
         """
         print("Extracting k-mer features...")
-        extractor = KmerExtractor(
-            k_size=self.kmer_size,
-            file_dir=self.raw_data_output_dir,
-            output_dir=self.feature_output_dir,
-        )
+        extractor = KmerExtractor(k_size=self.kmer_size, bac_name=self.bac_name)
         extractor.process_sequences()
         print("K-mer feature extraction finished.")
 
@@ -92,6 +90,7 @@ class GeneticDataset(DatasetInterface):
             feature_dir=self.feature_output_dir,
             k_size=self.kmer_size,
             output_dir=self.dataset_output_dir,
+            bac_name=self.bac_name,
         )
         # Modify DatasetGenerator to return the DataFrame instead of saving to a file
         # This might require changes in the DatasetGenerator class.
@@ -119,7 +118,7 @@ class GeneticDataset(DatasetInterface):
         Fetches, extracts, and generates the dataset if it hasn't been created yet.
         """
         if self._treated_data is None:
-            # self._fetch_raw_data()
+            self._fetch_raw_data()
             self._extract_features()
             self._treated_data = self._generate_combined_dataset()
         return self._treated_data

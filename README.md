@@ -70,3 +70,7 @@ Run:
 sudo apt update
 sudo apt install jellyfish
 ```
+
+### AMR DATA
+Genetic MIC data retrived from:
+[PATRICK](https://www.bv-brc.org/)
