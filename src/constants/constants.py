@@ -4,23 +4,28 @@ SRA_ID_LIST_ECH = [
     "ERR2091335",
     "ERR2931009",
     "ERR2091427",
-    #  'ERR3808917',
-    #  'ERR3808922',
-    #  'ERR2091362',
-    #  'ERR3808905',
-    #  'ERR2091397',
-    #  'ERR3808906',
-    #  'ERR2931025',
-    #  'ERR3808909',
-    #  'ERR2091330',
-    #  'ERR2091348',
-    #  'ERR3808921',
-    #  'ERR3808906',
-    #  'ERR2091312',
-    #  'ERR2091347',
-    #  'ERR2091415',
-    #  'ERR2091406',
-    #  'ERR2091425'
+    "ERR2091312",
+    "ERR2091418",
+    "ERR3808903",
+    "ERR3808914",
+    "ERR3808888",
+    "ERR2931033",
+    "ERR3808921",
+    "ERR2091340",
+    "ERR2091308",
+    "ERR2091307",
+    "ERR2091328",
+    "ERR3808887",
+    "ERR2091316",
+    "ERR3808890",
+    "ERR2091339",
+    "ERR3808876",
+    "ERR2091319",
+    "ERR2091414",
+    "ERR2091312",
+    "ERR2091397",
+    "ERR3808908",
+    "ERR2091401",
 ]
 EXCLUDE_LIST = []
 K_SIZE = 5
@@ -52,3 +57,5 @@ ANTIBIOTIC_LIST = [
 ANTIBIOTIC_FILE = "data/anti_rel"
 FEATURE_DIR = "data/features"
 DATASET_OUTPUT_DIR = "data/datasets"
+
+TOTAL_ROW_NUMBER = 50

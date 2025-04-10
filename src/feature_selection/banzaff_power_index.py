@@ -9,11 +9,13 @@ import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.metrics import mutual_info_score
 
+from entities.interfaces.feature_selection import FeatureSelectionInterface
+
 # Filter out the specific RuntimeWarning related to division by zero in np.corrcoef
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
-class BanzhafFeatureSelector:
+class BanzhafFeatureSelector(FeatureSelectionInterface):
     """
     Performs feature selection based on a modified Banzhaf power index
     with parallelization.
@@ -36,6 +38,7 @@ class BanzhafFeatureSelector:
             bins (int): The number of bins to use for histogram-based
                         probability distribution estimation.
         """
+        super().__init__(name="GTFE")
         self.n_features_to_select = n_features_to_select
         self.p_banzhaf = p_banzhaf
         self.n_jobs = n_jobs

@@ -1,160 +1,102 @@
-import os
-import sys
-from typing import List
+"""Module for running machine learning experiments on genetic data."""
 
+from typing import Any, List
+
+import numpy as np
 import pandas as pd
-from pandas import DataFrame
-from sklearn.model_selection import train_test_split
+from sklearn.base import BaseEstimator
+from sklearn.model_selection import cross_val_score
 
-from constants import constants as const  # Correct import path
-from data_providers.genetic_data.genetic_data_downloader import SraDownloader
-from data_providers.genetic_data.genetic_dataset_generator import \
-    DatasetGenerator  # Assuming this class generates the final dataset DataFrame
-from data_providers.genetic_data.kmer_extrator import KmerExtractor
-from data_providers.genetic_data.utils import \
-    create_folder  # Assuming create_folder is in utils.py
-from entities.interfaces.dataset import DatasetInterface
+import constants.constants as const
+from data_providers.genetic_data.genetic_data import GeneticDataset
+from entities.interfaces.feature_selection import FeatureSelectionInterface
 
 
-class GeneticDataset(DatasetInterface):
+class GeneticDataRun:
     """
-    A class to fetch, process, and represent a genetic dataset, adhering to the DatasetInterface.
+    Encapsulates the process of running a machine learning model on genetic data,
+    including feature selection and cross-validation.
     """
 
     def __init__(
         self,
-        sra_ids: List[str] = const.SRA_ID_LIST_KLEB,
-        exclude_ids: List[str] = const.EXCLUDE_LIST,
-        raw_data_output: str = const.FILE_DIR,
-        kmer_size: int = const.K_SIZE,
-        feature_output: str = const.FEATURE_DIR,
-        dataset_output: str = const.DATASET_OUTPUT_DIR,
-        name: str = "GeneticDataset",
-        metric_provider=None,
-        bac_name: str = "kleb",
-    ):
+        data: GeneticDataset,
+        target: str,
+        bac: str,
+        model: BaseEstimator,
+        fs: FeatureSelectionInterface,
+    ) -> None:
         """
-        Initializes the GeneticDataset.
+        Initializes the GeneticDataRun object.
 
         Args:
-            sra_ids: List of SRA IDs to process.
-            exclude_ids: List of SRA IDs to exclude.
-            raw_data_output: Directory to save raw genetic data.
-            kmer_size: Size of k-mers to extract as features.
-            feature_output: Directory to save k-mer features.
-            dataset_output: Directory to save the final dataset.
-            name: Name of the dataset.
-            metric_provider: Optional object to provide metrics.
+            data: The genetic dataset to be used.
+            target: The name of the target variable (e.g., antibiotic resistance).
+            bac: The name of the bacteria being analyzed.
+            model: The machine learning model to be trained and evaluated.
+            fs: The feature selection method to be used.
         """
-        super().__init__(raw_data=None, name=name, metric_provider=metric_provider)
-        self.bac_name = bac_name
-        self.sra_ids = sra_ids
-        self.exclude_ids = exclude_ids
-        self.raw_data_output_dir = raw_data_output + "/" + self.bac_name
-        self.kmer_size = kmer_size
-        self.feature_output_dir = feature_output + "/" + self.bac_name
-        self.dataset_output_dir = dataset_output + "/" + self.bac_name
-        self._treated_data: DataFrame = None
-        create_folder(self.raw_data_output_dir)
-        create_folder(self.feature_output_dir)
-        create_folder(self.dataset_output_dir)
-
-    def _fetch_raw_data(self) -> None:
-        """
-        Fetches raw genetic data (FASTQ files) from the NCBI SRA database.
-        """
-        print("Fetching raw genetic data from SRA...")
-        downloader = SraDownloader(
-            sra_id_list=self.sra_ids,
-            exclude_list=self.exclude_ids,
-            bac_name=self.bac_name,
-        )
-        downloader.download()
-        print("Raw genetic data fetching finished.")
-
-    def _extract_features(self) -> None:
-        """
-        Extracts k-mer features from the fetched raw genetic data and saves them to CSV files.
-        """
-        print("Extracting k-mer features...")
-        extractor = KmerExtractor(k_size=self.kmer_size, bac_name=self.bac_name)
-        extractor.process_sequences()
-        print("K-mer feature extraction finished.")
-
-    def _generate_combined_dataset(self) -> DataFrame:
-        """
-        Generates the combined dataset DataFrame by reading feature files and MIC data.
-        """
-        print("Generating the combined dataset DataFrame...")
-        generator = DatasetGenerator(
-            feature_dir=self.feature_output_dir,
-            k_size=self.kmer_size,
-            output_dir=self.dataset_output_dir,
-            bac_name=self.bac_name,
-        )
-        # Modify DatasetGenerator to return the DataFrame instead of saving to a file
-        # This might require changes in the DatasetGenerator class.
-        # For now, assuming it saves and we load it.
-        generator.generate_dataset()  # This will save the CSV
-        list_of_files = [
-            f for f in os.listdir(self.dataset_output_dir) if f.endswith(".csv")
-        ]
-        if not list_of_files:
-            raise FileNotFoundError(
-                f"No dataset CSV file found in {self.dataset_output_dir}"
-            )
-        latest_file = max(
-            [os.path.join(self.dataset_output_dir, f) for f in list_of_files],
-            key=os.path.getctime,
-        )
-        self._treated_data = DataFrame(pd.read_csv(latest_file))
-        print("Combined dataset DataFrame generated.")
-        return self._treated_data
+        self.data: GeneticDataset = data
+        self.target: str = target
+        self.bac: str = bac
+        self.model: BaseEstimator = model
+        self.fs: FeatureSelectionInterface = fs
 
     @property
-    def treated_data(self) -> DataFrame:
+    def _df(self) -> pd.DataFrame:
         """
-        Returns the treated genetic dataset as a Pandas DataFrame.
-        Fetches, extracts, and generates the dataset if it hasn't been created yet.
-        """
-        if self._treated_data is None:
-            self._fetch_raw_data()
-            self._extract_features()
-            self._treated_data = self._generate_combined_dataset()
-        return self._treated_data
-
-    def splitted_dataset(
-        self, test_size: float, random_state: int = None
-    ) -> list[DataFrame]:
-        """
-        Splits the treated dataset into training and testing sets.
-
-        Args:
-            test_size: The proportion of the dataset to use for the test set (e.g., 0.2 for 20%).
-            random_state: Optional random seed for reproducibility.
+        Returns the DataFrame containing features and the target variable,
+        excluding other antibiotic resistance columns.
 
         Returns:
-            A list containing two DataFrames: [train_df, test_df].
+            A Pandas DataFrame with relevant features and the target variable.
         """
-        if self.treated_data is None:
-            raise ValueError(
-                "Treated data is not available. Call treated_data property first."
-            )
-
-        train_df, test_df = train_test_split(
-            self.treated_data, test_size=test_size, random_state=random_state
+        anti_list_without_target: List[str] = const.ANTIBIOTIC_LIST.copy()
+        print(const.ANTIBIOTIC_LIST)
+        anti_list_without_target.remove(self.target)
+        return self.data.treated_data.drop(
+            anti_list_without_target, axis=1, errors="ignore"
         )
-        return [train_df, test_df]
 
     @property
-    def metrics(self):
+    def _X(self) -> pd.DataFrame:
         """
-        Returns the metrics provider object (if set).
-        """
-        return self.metric_provider
+        Returns the feature matrix (independent variables).
 
-    def run_pipeline(self) -> DataFrame:
+        Returns:
+            A Pandas DataFrame containing the features.
         """
-        Executes the entire data processing pipeline and returns the treated dataset.
+        return self._df.drop(self.target, axis=1, errors="ignore")
+
+    @property
+    def _y(self) -> pd.Series:
         """
-        return self.treated_data
+        Returns the target variable (dependent variable).
+
+        Returns:
+            A Pandas Series containing the target variable.
+        """
+        return self._df[self.target]
+
+    @property
+    def _selected_features(self) -> pd.DataFrame:
+        """
+        Performs feature selection and returns the DataFrame with selected features.
+
+        Returns:
+            A Pandas DataFrame containing the selected features.
+        """
+        print(f"Starting Feature Selection: {self.fs.name} on bac {self.bac}")
+        return self.fs.fit(self._df, self._X, self._y)
+
+    def run(self) -> np.ndarray:
+        """
+        Runs the machine learning pipeline: performs feature selection and
+        evaluates the model using cross-validation.
+
+        Returns:
+            A NumPy array containing the cross-validation scores.
+        """
+        selected_df: pd.DataFrame = self._selected_features
+        scores: np.ndarray = cross_val_score(self.model, selected_df, self._y, cv=10)
+        return scores
