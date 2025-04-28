@@ -8,5 +8,5 @@ class FeatureSelectionInterface(ABC):
         self.name = name
 
     @abstractmethod
-    def fit(self, data: DataFrame) -> DataFrame:
+    def fit(self, data: DataFrame, target_column: str) -> DataFrame:
         pass

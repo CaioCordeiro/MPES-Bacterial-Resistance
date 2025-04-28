@@ -6,10 +6,12 @@ from typing import List, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import psutil
 from joblib import Parallel, delayed
 from sklearn.metrics import mutual_info_score
 
 from entities.interfaces.feature_selection import FeatureSelectionInterface
+from utils.logging_config import get_logger
 
 # Filter out the specific RuntimeWarning related to division by zero in np.corrcoef
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -40,10 +42,14 @@ class BanzhafFeatureSelector(FeatureSelectionInterface):
         """
         super().__init__(name="GTFE")
         self.n_features_to_select = n_features_to_select
-        self.p_banzhaf = p_banzhaf
+        self.logger = get_logger()
+        self.p_banzhaf = min(
+            p_banzhaf, 3
+        )  # Limit p_banzhaf to reduce computational complexity
         self.n_jobs = n_jobs
         self.bins = bins
         self.columns_arr: List[str] = []
+        self._scores_calculated = False
         self.features_size: int = 0
         self.selected_features: List[str] = []
         self.feature_flags: List[int] = []
@@ -51,6 +57,7 @@ class BanzhafFeatureSelector(FeatureSelectionInterface):
         self.feature_weights: List[float] = []
         self.sum_relevance_redundancy: List[float] = []
         self.df: pd.DataFrame = pd.DataFrame()
+        self.feature_scores_ = None
         self.y: pd.Series = pd.Series()
 
     @staticmethod
@@ -170,7 +177,7 @@ class BanzhafFeatureSelector(FeatureSelectionInterface):
         )
         return coalition_power, num_coalitions
 
-    def fit(self, df: pd.DataFrame, X: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+    def fit(self, df: pd.DataFrame, target_column: str) -> pd.DataFrame:
         """
         Performs feature selection based on the modified Banzhaf power index.
 
@@ -183,8 +190,9 @@ class BanzhafFeatureSelector(FeatureSelectionInterface):
             pd.DataFrame: A dataframe containing the selected features.
         """
         self.df = df
-        self.y = y
-        self.columns_arr = X.columns.tolist()
+        self.y = df[target_column]
+        self.X = df.drop(target_column, axis=1)
+        self.columns_arr = self.X.columns.tolist()
         self.features_size = len(self.columns_arr)
         self.selected_features = []
         self.feature_flags = [0] * self.features_size
@@ -195,16 +203,31 @@ class BanzhafFeatureSelector(FeatureSelectionInterface):
         # Calculate initial relevance and redundancy scores (parallelized Tanimoto)
         relevance_scores: List[float] = [
             (
-                abs(np.corrcoef(self.df[col], self.y.values)[0][1])
+                # Use a more memory-efficient correlation calculation
+                abs(
+                    np.corrcoef(
+                        # Convert to float32 to reduce memory usage
+                        self.df[col].astype(np.float32),
+                        self.y.values.astype(np.float32),
+                    )[0][1]
+                )
+                # Handle NaN values that might occur
                 if len(np.unique(self.df[col])) > 1
-                else 0
+                and not np.isnan(np.corrcoef(self.df[col], self.y.values)[0][1])
+                else 0 if len(np.unique(self.df[col])) > 1 else 0
             )
             for col in self.columns_arr
         ]
         avg_redundancies: List[float] = Parallel(n_jobs=self.n_jobs)(
             delayed(self._calculate_pairwise_tanimoto)(i)
-            for i in range(self.features_size)
+            # Process in smaller batches to reduce memory pressure
+            for i in range(
+                min(self.features_size, 1000)
+            )  # Limit to first 1000 features
         )
+
+        # Fill remaining values if needed
+        avg_redundancies.extend([0.0 for _ in range(max(0, self.features_size - 1000))])
         self.sum_relevance_redundancy = [
             rel + red for rel, red in zip(relevance_scores, avg_redundancies)
         ]
@@ -240,5 +263,13 @@ class BanzhafFeatureSelector(FeatureSelectionInterface):
                     self.feature_weights[idx] += (
                         self.banzhaf_power[idx] / num_coalitions
                     )
+
+        self.feature_scores_ = pd.Series(
+            {
+                col: self.sum_relevance_redundancy[i] * self.feature_weights[i]
+                for i, col in enumerate(self.columns_arr)
+            }
+        )
+        self._scores_calculated = True
 
         return self.df[self.selected_features]

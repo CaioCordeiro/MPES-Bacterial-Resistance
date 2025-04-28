@@ -4,6 +4,7 @@ from datetime import datetime
 from itertools import product
 
 import pandas as pd
+
 from utils import create_folder, normalize_mic, write_csv_file
 
 ANTIBIOTIC_LIST = [

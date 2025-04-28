@@ -1,12 +1,15 @@
 import csv
 import os
 
+import pandas as pd
+
 
 def create_folder(path: str):
     """
-    @param path: string, name of folder to create
+    Create folder if not exists.
 
-    Create folder if not exists
+    Args:
+        path: string, name of folder to create
     """
     if not os.path.exists(path):
         os.makedirs(path)
@@ -14,10 +17,11 @@ def create_folder(path: str):
 
 def write_csv_file(fname, data, header=None, *args, **kwargs):
     """
-    @param fname: string, name of file to write
-    @param data: list of list of items
+    Write data to file.
 
-    Write data to file
+    Args:
+        fname: string, name of file to write
+        data: list of list of items
     """
     csv_file = csv.writer(open(fname, "w"), *args, **kwargs)
 
@@ -30,9 +34,10 @@ def write_csv_file(fname, data, header=None, *args, **kwargs):
 
 def normalize_mic(value: str):
     """
-    @param fname: string, value to normalize
+    Normalize value following Nguyen rules.
 
-    Normalize value following Nguyen rules
+    Args:
+        fname: string, value to normalize
     """
     if "/" in value:
         value = value.split("/")[0]
@@ -47,3 +52,27 @@ def normalize_mic(value: str):
         return float(value.replace(">", "")) * 2
 
     return float(value)
+
+
+def check_dataset_file(filepath: str, verbose: bool = True):
+    """
+    Check if a dataset file exists and contains valid data.
+
+    Args:
+        filepath: Path to the dataset file
+        verbose: Whether to print detailed information
+
+    Returns:
+        bool: True if file exists and contains data, False otherwise
+    """
+    if not os.path.exists(filepath):
+        if verbose:
+            print(f"Dataset file not found: {filepath}")
+        return False
+
+    if os.path.getsize(filepath) <= 1:
+        if verbose:
+            print(f"Dataset file is empty: {filepath}")
+        return False
+
+    return True

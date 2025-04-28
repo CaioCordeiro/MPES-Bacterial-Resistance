@@ -136,3 +136,4 @@ share/*
 
 *.tar*
 *.tmp*
+*.csv

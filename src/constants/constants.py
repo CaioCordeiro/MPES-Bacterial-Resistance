@@ -59,3 +59,10 @@ FEATURE_DIR = "data/features"
 DATASET_OUTPUT_DIR = "data/datasets"
 
 TOTAL_ROW_NUMBER = 50
+
+# Resource limits
+MAX_MEMORY_PERCENT = 80.0
+MAX_CONCURRENT_DOWNLOADS = 3
+MAX_PROCESSES = 4
+
+CACHE_DIR = "data/cache"
