@@ -1,6 +1,7 @@
 import fcntl
 import hashlib
 import os
+import os.path
 import threading
 import time
 from typing import Dict, List, Optional
@@ -27,6 +28,7 @@ class KmerExtractor:
         kmer_counter_dir: str = "data/kmer_counter",
         exclude_list: List[str] = [],
         cache_dir: str = "data/cache",
+        root_dir: str = '.',
         bac_name: str = "kleb",
         max_memory_percent: float = 70.0,
     ):
@@ -41,12 +43,13 @@ class KmerExtractor:
             exclude_list: A list of SRA IDs to exclude from processing.
             max_memory_percent: Maximum percentage of system memory to use
         """
+        self.root_dir = root_dir
         self.bac_name = bac_name
         self.k_size = k_size
-        self.file_dir = file_dir + "/" + self.bac_name
-        self.output_dir = output_dir + "/" + self.bac_name
-        self.kmer_counter_dir = kmer_counter_dir + "/" + self.bac_name
-        self.cache_dir = cache_dir
+        self.file_dir = os.path.join(self.root_dir, file_dir, self.bac_name)
+        self.output_dir = os.path.join(self.root_dir, output_dir, self.bac_name)
+        self.kmer_counter_dir = os.path.join(self.root_dir, kmer_counter_dir, self.bac_name)
+        self.cache_dir = os.path.join(self.root_dir, cache_dir)
         self.lock_dir = os.path.join(self.cache_dir, "locks")
         self.max_memory_percent = max_memory_percent
         self.exclude_list = exclude_list
@@ -58,10 +61,10 @@ class KmerExtractor:
         )
         self._command_get_kmers = f"jellyfish count -m {self.k_size} -s {mem_limit}M -t 4 {self.file_dir}/<seq_name>/<seq_name>.fasta -o {self.kmer_counter_dir}/<seq_name>.jf"
         self._command_dump_data = f"jellyfish dump -c {self.kmer_counter_dir}/<seq_name>.jf > {self.kmer_counter_dir}/<seq_name>.fa"
-        create_folder(self.kmer_counter_dir)
-        create_folder(self.output_dir)
-        create_folder(self.cache_dir)
-        create_folder(self.lock_dir)
+        create_folder(os.path.join(self.root_dir, self.kmer_counter_dir))
+        create_folder(os.path.join(self.root_dir, self.output_dir))
+        create_folder(os.path.join(self.root_dir, self.cache_dir))
+        create_folder(os.path.join(self.root_dir, self.lock_dir))
 
     def _acquire_lock(self, seq_name: str) -> Optional[int]:
         """
@@ -73,7 +76,7 @@ class KmerExtractor:
         Returns:
             Optional file descriptor if lock was acquired, None otherwise.
         """
-        lock_file = os.path.join(self.lock_dir, f"{seq_name}.lock")
+        lock_file = os.path.join(self.root_dir, self.lock_dir, f"{seq_name}.lock")
         try:
             fd = open(lock_file, "w")
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -95,7 +98,7 @@ class KmerExtractor:
     def _check_cache(self, seq_name: str) -> Dict[str, str]:
         """Check if k-mer data for the given sequence is already cached."""
         cache_key = self._get_cache_key(seq_name)
-        cache_file = os.path.join(self.cache_dir, f"{cache_key}.csv")
+        cache_file = os.path.join(self.output_dir, f"{seq_name}.csv")
         if os.path.exists(cache_file):
             self.logger.debug(f"Using cached k-mer data for: {seq_name}")
             with open(cache_file, "r") as file:
@@ -105,7 +108,7 @@ class KmerExtractor:
     def _save_to_cache(self, seq_name: str, data: Dict[str, str]) -> None:
         """Save k-mer data to cache."""
         cache_key = self._get_cache_key(seq_name)
-        cache_file = os.path.join(self.cache_dir, f"{cache_key}.csv")
+        cache_file = os.path.join(self.output_dir, f"{seq_name}.csv")
         with open(cache_file, "w") as file:
             for key, value in data.items():
                 file.write(f"{key},{value}\n")
@@ -133,7 +136,7 @@ class KmerExtractor:
             A dictionary where keys are k-mers and values are their counts.
         """
         output_dict: Dict[str, str] = {}
-        filepath = f"{self.kmer_counter_dir}/{seq_name}.fa"
+        filepath = os.path.join(self.root_dir, self.kmer_counter_dir, f"{seq_name}.fa")
         try:
             with open(filepath, "r") as file:
                 number = None
@@ -154,8 +157,8 @@ class KmerExtractor:
             sra_id: The SRA identifier of the sequence.
             data: A dictionary containing k-mers and their counts.
         """
-        total_kmer_list = list(data.values())
-        write_csv_file(f"{self.output_dir}/{sra_id}.csv", [total_kmer_list])
+        output_file = os.path.join(self.root_dir, self.output_dir, f"{sra_id}.csv")
+        write_csv_file(output_file, [list(data.values())])
 
     def _process_batch(self, file_list: List[str]) -> None:
         for file_name in file_list:
@@ -166,15 +169,15 @@ class KmerExtractor:
                 continue
 
             # Check if output file already exists
-            output_file = f"{self.output_dir}/{sra_id}.csv"
+            output_file = os.path.join(self.root_dir, self.output_dir, f"{sra_id}.csv")
             if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
                 self.logger.debug(f"Output file already exists for {sra_id}, skipping.")
                 continue
 
-            cached_data = self._check_cache(sra_id)
-            if cached_data:
-                self._save_kmer_data(sra_id=sra_id, data=cached_data)
-                continue
+            # cached_data = self._check_cache(sra_id)
+            # if cached_data:
+            #     # self._save_kmer_data(sra_id=sra_id, data=cached_data)
+            #     continue
 
             # Try to acquire lock for this sequence
             lock_fd = self._acquire_lock(sra_id)
@@ -186,17 +189,17 @@ class KmerExtractor:
                 # Wait for the cache file to appear
                 max_wait_time = 300  # 5 minutes timeout
                 wait_time = 0
-                cache_key = self._get_cache_key(sra_id)
-                cache_file = os.path.join(self.cache_dir, f"{cache_key}.csv")
+                # cache_key = self._get_cache_key(sra_id)
+                # cache_file = os.path.join(self.root_dir, self.cache_dir, f"{cache_key}.csv")
                 while wait_time < max_wait_time:
-                    if os.path.exists(cache_file) or os.path.exists(output_file):
+                    if os.path.exists(output_file):
                         self.logger.info(
                             f"Sequence {sra_id} is now processed by another thread."
                         )
                         cached_data = self._check_cache(sra_id)
                         if cached_data:
-                            self._save_kmer_data(sra_id=sra_id, data=cached_data)
-                        return
+                        #     self._save_kmer_data(sra_id=sra_id, data=cached_data)
+                            return
                     time.sleep(5)
                     wait_time += 5
                 self.logger.warning(
@@ -217,7 +220,7 @@ class KmerExtractor:
 
                 self._run_jellyfish_commands(sra_id)
                 kmer_data = self._parse_jellyfish_output(sra_id)
-                self._save_to_cache(sra_id, kmer_data)
+                # self._save_to_cache(sra_id, kmer_data)
                 self._save_kmer_data(sra_id=sra_id, data=kmer_data)
                 self.logger.debug(
                     f"Processing {sra_id} took {time.time() - start_time:.2f} seconds"

@@ -214,6 +214,7 @@ class LinearRegressionModel:
             "r2_score": r2,
             "n_features": len(self.X_columns),
             "status": "Fitted",
+            "confusion_matrix": [],  # Linear regression does not have a confusion matrix
         }
 
         if hasattr(self.model, "coef_"):

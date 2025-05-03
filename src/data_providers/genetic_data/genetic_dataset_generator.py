@@ -1,6 +1,7 @@
 import csv
 import fcntl
 import os
+import os.path
 import threading
 import time
 from datetime import datetime
@@ -9,7 +10,7 @@ from typing import IO, Dict, Generator, List, Optional
 
 import pandas as pd
 
-from constants.constants import (ANTIBIOTIC_FILE, ANTIBIOTIC_LIST,
+from constants.constants import (ANTIBIOTIC_FILE, ANTIBIOTIC_LIST, ROOT_DIR,
                                  DATASET_OUTPUT_DIR, FEATURE_DIR, K_SIZE,
                                  MAX_MEMORY_PERCENT)
 from utils.logging_config import get_logger
@@ -24,12 +25,11 @@ class DatasetGenerator:
     with antibiotic Minimum Inhibitory Concentration (MIC) data.
     """
 
-    def __init__(
-        self,
+    def __init__(self, root_dir: str = ROOT_DIR,
         feature_dir: str = FEATURE_DIR,
         output_dir: str = DATASET_OUTPUT_DIR,
         antibiotic_file: str = ANTIBIOTIC_FILE,
-        antibiotic_list: List[str] = None,
+        antibiotic_list: List[str] = ANTIBIOTIC_LIST,
         k_size: int = K_SIZE,
         cache_dir: str = "data/cache",
         memory_limit_percent: float = MAX_MEMORY_PERCENT,
@@ -39,6 +39,7 @@ class DatasetGenerator:
         Initializes the DatasetGenerator.
 
         Args:
+            root_dir: The root directory for all other files.
             feature_dir: The directory containing the k-mer count CSV files.
             output_dir: The directory where the generated dataset CSV will be saved.
             antibiotic_file: The path to the CSV file containing antibiotic MIC data.
@@ -47,25 +48,22 @@ class DatasetGenerator:
             k_size: The size of the k-mers used to generate the feature files.
             memory_limit_percent: Maximum percentage of system memory to use
         """
+        self.root_dir = root_dir
         self.bac_name = bac_name
-        self.feature_dir = feature_dir
-        self.output_dir = output_dir
-        self.lock_dir = os.path.join(cache_dir, "locks")
-        self.antibiotic_file = (
-            f"{antibiotic_file}/{self.bac_name}/antibotic_relation.csv"
-        )
+        self.feature_dir = os.path.join(self.root_dir, feature_dir)
+        self.output_dir = os.path.join(self.root_dir, output_dir)
+        self.cache_dir = os.path.join(self.root_dir, cache_dir)
+        self.lock_dir = os.path.join(self.cache_dir, "locks")
+        self.antibiotic_file = os.path.join(self.root_dir, f"{antibiotic_file}/{self.bac_name}/antibotic_relation.csv")
         self.dataset_lock_file = os.path.join(
             self.lock_dir, f"{self.bac_name}_dataset.lock"
         )
-        self.antibiotic_list = (
-            antibiotic_list if antibiotic_list is not None else ANTIBIOTIC_LIST
-        )
+        self.antibiotic_list = antibiotic_list
         self.k_size = k_size
-        self.cache_dir = cache_dir
         self.memory_limit_percent = memory_limit_percent
-        create_folder(self.output_dir)
-        create_folder(self.cache_dir)
-        create_folder(self.lock_dir)
+        create_folder(os.path.join(self.root_dir, self.output_dir))
+        create_folder(os.path.join(self.root_dir, self.cache_dir))
+        create_folder(os.path.join(self.root_dir, self.lock_dir))
         self.logger = get_logger()
 
     def _acquire_lock(self) -> Optional[IO]:
@@ -149,14 +147,14 @@ class DatasetGenerator:
             return [0.0] * len(self.antibiotic_list)
 
     def _get_phenotype_data(
-        self, seq_name: str, mic_columns: List[str] = None
+        self, seq_name: str, phenotype_columns: List[str] = None
     ) -> List[float]:
         """
         Retrieves and normalizes Resistant Phenotype data for a given sequence from the antibiotic file.
 
         Args:
             seq_name: The SRA identifier of the sequence.
-            mic_columns: The column names in the antibiotic file.
+            phenotype_columns: The column names in the antibiotic file.
                          Defaults to ["genome", "sra_id", "patric_id", "antibiotic", "Resistant Phenotype", "mic_predicted"].
 
         Returns:
@@ -180,8 +178,8 @@ class DatasetGenerator:
             phenotype_list = []
             for antibiotic in self.antibiotic_list:
                 phenotype_list.append(actual_phenotype.get(antibiotic.lower(), 0))
-            phenotype_list = [0 if p == "Susceptible" else 1 for p in phenotype_list]
-            self.logger.debug(f"phenotype data for {seq_name}: {phenotype_list}")
+            # phenotype_list = [0 if p == "Susceptible" else 1 for p in phenotype_list]
+            self.logger.debug(f"Phenotype data for {seq_name}: {phenotype_list}")
             return phenotype_list
         except FileNotFoundError:
             self.logger.error(
@@ -204,7 +202,7 @@ class DatasetGenerator:
         Returns:
             A list of k-mer counts.
         """
-        filepath = os.path.join(self.feature_dir, file_name)
+        filepath = os.path.join(self.root_dir, self.feature_dir, file_name)
         try:
             with open(filepath, "r") as csvfile:
                 csvreader = csv.reader(csvfile)
@@ -229,7 +227,7 @@ class DatasetGenerator:
         seq_data: List[List] = []
 
         # Output file path
-        output_filepath = os.path.join(self.output_dir, f"{self.bac_name}_dataset.csv")
+        output_filepath = os.path.join(self.root_dir, self.output_dir, f"{self.bac_name}_dataset.csv")
 
         # Try to acquire lock for dataset generation
         lock_fd = self._acquire_lock()
@@ -263,7 +261,7 @@ class DatasetGenerator:
                 self.logger.warning(f"No feature files found in {self.feature_dir}")
 
             # Check for cached dataset
-            cache_file = os.path.join(self.cache_dir, f"{self.bac_name}_dataset.csv")
+            cache_file = os.path.join(self.root_dir, self.cache_dir, f"{self.bac_name}_dataset.csv")
             if os.path.exists(cache_file):
                 self.logger.info(f"Using cached dataset for: {self.bac_name}")
                 df = pd.read_csv(cache_file, low_memory=False)
@@ -298,7 +296,7 @@ class DatasetGenerator:
             df = pd.DataFrame(seq_data, columns=columns)
 
             # Cache the generated dataset
-            df.to_csv(cache_file, index=False)
+            df.to_csv(os.path.join(self.root_dir, cache_file), index=False)
             self._save_dataset(df)
 
         finally:
@@ -311,7 +309,7 @@ class DatasetGenerator:
         Args:
             df: A DataFrame representing the generated dataset.
         """
-        output_filepath = os.path.join(self.output_dir, f"{self.bac_name}_dataset.csv")
+        output_filepath = os.path.join(self.root_dir, self.output_dir, f"{self.bac_name}_dataset.csv")
         df.to_csv(output_filepath, index=False)
 
         # Validate the saved dataset

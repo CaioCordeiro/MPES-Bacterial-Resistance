@@ -1,13 +1,31 @@
-from abc import ABC, abstractmethod
+from typing import Optional
+import numpy as np
 
-from pandas import DataFrame
-from sklean import Model
+class ModelInterface:
+    """
+    Interface for machine learning models.
+    """
 
+    def fit(self, X, y):
+        """
+        Fits the model to the provided data.
+        """
+        raise NotImplementedError
 
-class ModelInterface(ABC):
-    def __init__(self, name) -> None:
-        self.name = name
+    def predict(self, X):
+        """
+        Makes predictions using the fitted model.
+        """
+        raise NotImplementedError
 
-    @abstractmethod
-    def algorithmImplementation(self, data: DataFrame) -> Model:
+    def get_model_summary(self) -> dict:
+        """
+        Returns a summary of the model's performance and configuration.
+        """
+        raise NotImplementedError
+
+    def get_confusion_matrix(self) -> Optional[np.ndarray]:
+        """
+        Returns the confusion matrix of the model, if applicable.
+        """
         pass

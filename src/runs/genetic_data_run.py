@@ -23,13 +23,10 @@ class GeneticDataRun:
         target: str,
         bac: str,
         model: BaseEstimator,
-        fs: FeatureSelectionInterface,
+        fs: Optional[FeatureSelectionInterface] = None,
         run_config: Optional[Dict[str, Any]] = None,
+        selected_features: Optional[List[str]] = None,
     ):
-        if not hasattr(data, "treated_data") or data.treated_data is None:
-            raise ValueError(
-                "Dataset must be fully prepared before passing to GeneticDataRun"
-            )
 
         self.logger = get_logger()
         self.data: GeneticDataset = data
@@ -37,6 +34,7 @@ class GeneticDataRun:
         self.bac: str = bac
         self.model: BaseEstimator = model
         self.fs: FeatureSelectionInterface = fs
+        self._selected_features: List[str] = selected_features if selected_features else []
         # self.results_store: RunResults = RunResults() # Removed
         self.run_config: Dict[str, Any] = run_config if run_config is not None else {}
         # Base config - more details added in run()
@@ -46,7 +44,8 @@ class GeneticDataRun:
                 "target": target,
                 "bacteria": bac,
                 "model_class": model.__class__.__name__,  # Store class name
-                "feature_selection": fs.name,
+                "feature_selection": fs.name if fs else None,
+                "selected_features": selected_features if selected_features else None,
                 "n_features_requested": getattr(
                     fs, "n_features_to_select", None
                 ),  # Store requested features
@@ -64,12 +63,12 @@ class GeneticDataRun:
             pd.DataFrame: The filtered DataFrame.
         """
         anti_list_without_target = const.ANTIBIOTIC_LIST.copy()
-        self.logger.debug(f"Antibiotic list: {const.ANTIBIOTIC_LIST}")
+        # self.logger.debug(f"Antibiotic list: {const.ANTIBIOTIC_LIST}")
         if self.target in anti_list_without_target:
             anti_list_without_target.remove(self.target)
         return self.data.treated_data.drop(
             anti_list_without_target, axis=1, errors="ignore"
-        )
+        ).dropna()
 
     @property
     def _X(self):
@@ -92,26 +91,28 @@ class GeneticDataRun:
         return self._df[self.target]
 
     @property
-    def _selected_features(self):
+    def selected_features(self):
         """
         Performs feature selection and returns the DataFrame with selected features.
 
         Returns:
             pd.DataFrame: The DataFrame containing only the selected features.
         """
-        self.logger.info(
-            f"Starting Feature Selection: {self.fs.name} for {self.fs.n_features_to_select} features on bacteria {self.bac}"
-        )
-        # Ensure fit returns the DataFrame with selected features
-        selected_data = self.fs.fit(
-            self._df.copy(), self.target
-        )  # Pass a copy to avoid modifying original _df if fs modifies inplace
-        # Extract only the feature columns (X part) from the result of fit
-        selected_X = selected_data.drop(columns=[self.target], errors="ignore")
-        self.logger.info(
-            f"Finished Feature Selection: {self.fs.name} on bacteria {self.bac}. Selected {selected_X.shape[1]} features."
-        )
-        return selected_X  # Return only the features DataFrame
+        if self.fs:
+            self.logger.info(
+                f"Starting Feature Selection: {self.fs.name} for {self.fs.n_features_to_select} features on bacteria {self.bac}"
+            )
+            # Ensure fit returns the DataFrame with selected features
+            selected_data = self.fs.fit(
+                self._df.copy(), self.target
+            )  # Pass a copy to avoid modifying original _df if fs modifies inplace
+            # Extract only the feature columns (X part) from the result of fit
+            selected_X = selected_data.drop(columns=[self.target], errors="ignore")
+            self.logger.info(
+                f"Finished Feature Selection: {self.fs.name} on bacteria {self.bac}. Selected {selected_X.shape[1]} features."
+            )
+            return selected_X  # Return only the features DataFrame
+        return self._df[self._selected_features]
 
     def run(self) -> Dict[str, Any]:  # Changed return type
         """
@@ -121,7 +122,7 @@ class GeneticDataRun:
             Dict[str, Any]: A dictionary containing the run results and configuration.
         """
         selected_X_df = (
-            self._selected_features
+            self.selected_features
         )  # Get the DataFrame with selected features
         target_y = self._y  # Get the target series
 

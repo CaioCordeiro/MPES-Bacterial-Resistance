@@ -2,17 +2,18 @@ import argparse  # Make sure this import is at the top of the file
 import os  # Import os if needed for path manipulation
 import time  # Import time for timestamping plots if needed
 from typing import Any, Dict, List
-
 import matplotlib.pyplot as plt  # Make sure this is imported
 import numpy as np  # Make sure this is imported
 
 from data_providers.genetic_data.genetic_data import \
     GeneticDataset  # Make sure this is imported
-from entities.models.linear_regression_model import \
+from models.linear_regression_model import \
     LinearRegressionModel  # Make sure this is imported
+from models.svm import SupportVectorMachineModel
 from feature_selection.pearson_correlation import \
     PearsonCorrelationSelector  # Make sure this is imported
-# ... other imports ...
+from feature_selection.banzaff_power_index import BanzhafFeatureSelector
+from feature_selection.shap_feature_selector import ShapFeatureSelector
 from pipeline.pipeline import Pipeline
 from runs.run_results import \
     save_final_results  # Import if saving here instead of Pipeline
@@ -28,7 +29,7 @@ def check_and_prepare_data(bac_name, max_sra_ids):
     logger.info(f"Checking/Preparing data for {bac_name} (max_ids={max_sra_ids})...")
     # Placeholder: Add actual data preparation logic using GeneticDataset
     try:
-        dataset = GeneticDataset(bac_name=bac_name, max_sra_ids=max_sra_ids)
+        dataset = GeneticDataset(bac_name=bac_name, max_sra_ids=max_sra_ids, root_dir='/mnt/d')
         # Trigger data loading/generation if not cached
         _ = dataset.treated_data
         logger.info(f"Data preparation successful for {bac_name}.")
@@ -209,6 +210,41 @@ def plot_results(results: List[Dict[str, Any]], title: str):
     # plt.show() # Comment out if running in a non-GUI environment
 
 
+def plot_metrics(results: List[Dict[str, Any]], bacteria: str):
+    metrics = {
+        "f1_score": [],
+        "accuracy": [],
+        "n_features": []
+    }
+
+    for result in results:
+        if result.get("bacteria") == bacteria:
+            metrics["n_features"].append(result.get("n_features_requested"))
+            metrics["f1_score"].append(result.get("model_summary", {}).get("f1_score", 0))
+            metrics["accuracy"].append(result.get("model_summary", {}).get("accuracy", 0))
+
+    feature_sizes = sorted(set(metrics["n_features"]))
+    
+    plt.figure(figsize=(10, 6))
+    
+    # Plot F1 Score
+    plt.plot(feature_sizes, [metrics["f1_score"][metrics["n_features"].index(n)] for n in feature_sizes], marker='o', label='F1 Score')
+    
+    # Plot Accuracy
+    plt.plot(feature_sizes, [metrics["accuracy"][metrics["n_features"].index(n)] for n in feature_sizes], marker='o', label='Accuracy')
+
+    plt.title(f'Metrics for {bacteria}')
+    plt.xlabel('Number of Features')
+    plt.ylabel('Metric Value')
+    plt.legend()
+    plt.grid()
+    
+    plt.savefig(f'{bacteria}_metrics.jpg')
+    plt.close()
+
+    print(f"Metrics plot saved for {bacteria} as {bacteria}_metrics.jpg")
+
+
 def main():
     # --- Argument Parser Setup --- <<< ADD THIS SECTION
     parser = argparse.ArgumentParser(description="Run Genetic Analysis Pipeline")
@@ -241,20 +277,22 @@ def main():
 
     args = parser.parse_args()  # This line should now work
     print(args)
-    logger = setup_logging(args.log_level, args.log_file)
+    logger = setup_logging(args.log_level, f"{time.strftime('%Y%m%d-%H:%M:%S')}_{args.log_file}")
     logger.info(f"Starting pipeline with log level: {args.log_level}")
 
     bacteria_list = args.bacteria
     # Define models and feature selectors (ensure they are lists of classes)
-    models_to_run = [LinearRegressionModel]  # Add others like SVC if needed
+    models_to_run = [SupportVectorMachineModel]  # Add others like SVC if needed
     feature_selectors_to_run = [
-        PearsonCorrelationSelector
+        # PearsonCorrelationSelector,
+        # BanzhafFeatureSelector,
+        ShapFeatureSelector
     ]  # Add others like RReliefF if needed
 
     # Use a smaller range for faster testing initially
     # feature_range_to_run = range(5, 11, 5) # e.g., 5, 10
-    feature_range_to_run = range(5, 36, 5)  # Original range
-    target_antibiotic = "Ampicillin"  # Or get from args
+    feature_range_to_run = range(5, 200, 10)  # Original range
+    target_antibiotic = "ciprofloxacin"  # Or get from args
     # Create a more robust results filename
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     results_file = f"genetic_run_results_{'_'.join(bacteria_list)}_{timestamp}.json"
@@ -293,6 +331,7 @@ def main():
                     bac_results,
                     f"Results for {bac.upper()} - Target: {target_antibiotic}",
                 )
+                plot_metrics(bac_results, bac)  # Call to plot metrics
             else:
                 logger.warning(f"No results found to plot for bacteria: {bac}")
 

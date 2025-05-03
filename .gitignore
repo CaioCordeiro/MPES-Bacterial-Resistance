@@ -137,3 +137,10 @@ share/*
 *.tar*
 *.tmp*
 *.csv
+.codebuddy/*
+.vscode/*
+*.deb
+*.jpg
+*.png
+*.json
+notebooks/*

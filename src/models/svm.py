@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import psutil
 from sklearn.metrics import (  # Regression metrics for SVR; Classification metrics for SVC
-    accuracy_score, f1_score, mean_squared_error, r2_score)
+    accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score)
 from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, SVR  # Import SVR and SVC
@@ -71,6 +71,8 @@ class SupportVectorMachineModel:
         self._summary = {}
         self.scaler = StandardScaler()  # Initialize scaler here
         self.X_columns = None  # Initialize X_columns
+        self._X = None  # Store the original X for confusion matrix
+        self._y = None  # Store the original y for confusion matrix
 
         # Adjust CV parameters based on available memory
         memory_percent = psutil.virtual_memory().percent
@@ -92,6 +94,8 @@ class SupportVectorMachineModel:
             SupportVectorMachineModel: The fitted model instance.
         """
         self.X_columns = X.columns.tolist()
+        self._X = X  # Store the original X
+        self._y = y  # Store the original y
 
         # Check memory before proceeding
         memory_percent = psutil.virtual_memory().percent
@@ -298,20 +302,26 @@ class SupportVectorMachineModel:
         if self.model_type == "svc":
             try:
                 # Ensure y is suitable for classification metrics (e.g., integer labels)
-                y_true = y.astype(int)
+                y_true = self._y.astype(int)
                 metrics["accuracy"] = accuracy_score(y_true, y_pred)
                 # Use average='weighted' for multiclass or if classes are imbalanced
                 # Use average='binary' if strictly binary and want score for positive class
                 metrics["f1_score"] = f1_score(
                     y_true, y_pred, average="weighted", zero_division=0
                 )
+                # Cast all arrays inside confusion matrix to list
+                # This is necessary for JSON serialization
+                confusion_matrix_result = confusion_matrix(y_true, y_pred)
+                metrics["confusion_matrix"] = confusion_matrix_result.tolist()
+
+                # metrics["confusion_matrix"] = list(self.get_confusion_matrix())
             except Exception as e:
                 self.logger.error(f"Failed to calculate SVC metrics: {e}")
                 metrics["metrics_error"] = f"SVC metric calculation failed: {e}"
         elif self.model_type == "svr":
             try:
-                metrics["mean_squared_error"] = mean_squared_error(y, y_pred)
-                metrics["r2_score"] = r2_score(y, y_pred)
+                metrics["mean_squared_error"] = mean_squared_error(self._y, y_pred)
+                metrics["r2_score"] = r2_score(self._y, y_pred)
             except Exception as e:
                 self.logger.error(f"Failed to calculate SVR metrics: {e}")
                 metrics["metrics_error"] = f"SVR metric calculation failed: {e}"
@@ -345,9 +355,22 @@ class SupportVectorMachineModel:
 
         # --- Intercept ---
         if hasattr(self.model, "intercept_"):
-            self._summary["intercept"] = (
-                self.model.intercept_.tolist()
-            )  # Convert numpy array
+            self._summary["intercept"] = self.model.intercept_.tolist()  # Convert to list for JSON serialization
+
+    def get_confusion_matrix(self) -> Optional[np.ndarray]:
+        """
+        Returns the confusion matrix of the SVC model.
+        """
+        if self.model is None or self.model_type != "svc":
+            return None
+
+        try:
+            y_pred = self.model.predict(self.scaler.transform(self._X.values))
+            y_true = self._y.astype(int)
+            return confusion_matrix(y_true, y_pred)
+        except Exception as e: 
+            self.logger.error(f"Error calculating confusion matrix: {e}", exc_info=True)
+            return []
 
     def get_best_params(self) -> Dict[str, Any]:
         """

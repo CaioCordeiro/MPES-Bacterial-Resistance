@@ -1,5 +1,6 @@
 import fcntl
 import os
+import os.path
 import random
 import time
 from typing import Dict, Generator, List, Optional
@@ -21,6 +22,7 @@ class SraDownloader:
         sra_id_list: List[str] = [],
         exclude_list: List[str] = [],
         output_dir: str = "data/raw_data/",
+        root_dir: str = ".",
         max_sra_ids: Optional[int] = None,
         bac_name: str = "kleb",
         max_concurrent_downloads: int = 3,
@@ -33,10 +35,12 @@ class SraDownloader:
             sra_id_list: A list of SRA experiment identifiers to download.
             exclude_list: A list of SRA experiment identifiers to exclude from download.
             output_dir: The directory where downloaded FASTQ files will be saved.
+            root_dir: The root directory for all other files.
             max_sra_ids: Maximum number of SRA IDs to process. If None, all IDs are processed.
             bac_name: Name of the bacteria being processed.
             max_concurrent_downloads: Maximum number of concurrent downloads
         """
+        self.root_dir = root_dir
         # Filter out excluded IDs
         filtered_ids = list(set(sra_id_list) - set(exclude_list))
         # Limit the number of SRA IDs if max_sra_ids is specified
@@ -44,12 +48,13 @@ class SraDownloader:
             filtered_ids = random.sample(filtered_ids, max_sra_ids)
         self.sra_id_list = filtered_ids
         self.exclude_list = exclude_list
-        self.cache_dir = cache_dir
-        self.output_dir = output_dir
-        self.lock_dir = os.path.join(self.cache_dir, "locks")
+        self.cache_dir = os.path.join(self.root_dir, cache_dir)
+        self.output_dir = os.path.join(self.root_dir, output_dir)
+        self.temp = os.path.join(self.root_dir, "temp")
+        self.lock_dir = os.path.join(self.root_dir, self.cache_dir, "locks")
         self.bac_name = bac_name
         self.max_concurrent_downloads = max_concurrent_downloads
-        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(os.path.join(self.root_dir, self.output_dir), exist_ok=True)
         os.makedirs(self.cache_dir, exist_ok=True)
         os.makedirs(self.lock_dir, exist_ok=True)
         self.logger = get_logger()
@@ -64,7 +69,7 @@ class SraDownloader:
         Returns:
             Optional file descriptor if lock was acquired, None otherwise.
         """
-        lock_file = os.path.join(self.lock_dir, f"{experiment_id}.lock")
+        lock_file = os.path.join(self.root_dir, self.lock_dir, f"{experiment_id}.lock")
         try:
             fd = open(lock_file, "w")
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -100,7 +105,7 @@ class SraDownloader:
         Args:
             experiment_id: The SRA experiment identifier to download.
         """
-        cache_file = os.path.join(self.cache_dir, f"{experiment_id}.fasta")
+        cache_file = os.path.join(self.root_dir, self.output_dir, self.bac_name, experiment_id, f"{experiment_id}.fasta")
         if os.path.exists(cache_file):
             self.logger.debug(f"Using cached file for: {experiment_id}")
             return
@@ -151,18 +156,17 @@ class SraDownloader:
                     f"Low disk space ({disk_usage.percent}%). This may cause download failures."
                 )
 
-            output_path = os.path.join(self.output_dir, self.bac_name, experiment_id)
+            output_path = os.path.join(self.root_dir, self.output_dir, self.bac_name, experiment_id)
             self.logger.info(f"Downloading on: {output_path}")
-            temp_dir = "temp"
             os.makedirs(output_path, exist_ok=True)
-            os.makedirs(temp_dir, exist_ok=True)
+            os.makedirs(self.temp, exist_ok=True)
             # os.system(f"prefetch {experiment_id} -O {temp_dir}/pre_fetch/")
             # Use smaller hash table size and limit threads to reduce memory usage
-            command = f"fasterq-dump {experiment_id} -O {output_path} --fasta -p -t {temp_dir}/"
+            command = f"fasterq-dump {experiment_id} -O {output_path} --fasta -p -t {self.temp}/"
             os.system(command)
 
-            # Cache the downloaded filem,n
-            os.system(f"cp {output_path}/{experiment_id}.fasta {cache_file}")
+            # Cache the downloaded file
+            os.system(f"cp {os.path.join(output_path, experiment_id)}.fasta {cache_file}")
         except Exception as error:
             self.logger.error(f"Error downloading file for: {experiment_id}\n{error}")
         finally:

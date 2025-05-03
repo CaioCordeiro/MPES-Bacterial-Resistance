@@ -1,3 +1,5 @@
+ROOT_DIR = "."
+
 SRA_ID_LIST_KLEB = ["SRR5386221", "SRR5386094", "SRR5386629"]
 SRA_ID_LIST_ECH = [
     "ERR2091428",
@@ -32,27 +34,27 @@ K_SIZE = 5
 FILE_DIR = "data/raw_data"
 OUTPUT_DIR = "data/features"
 ANTIBIOTIC_LIST = [
-    "Amikacin",
-    "Ampicillin",
-    "Ampicillin/Sulbactam",
-    "Aztreonam",
-    "Cefazolin",
-    "Cefepime",
-    "Cefoxitin",
-    "Ceftazidime",
-    "Ceftriaxone",
-    "Cefuroxime sodium",
-    "Ciprofloxacin",
-    "Gentamicin",
-    "Imipenem",
-    "Levofloxacin",
-    "Meropenem",
-    "Nitrofurantoin",
-    "Piperacillin/Tazobactam",
-    "Tetracycline",
-    "Tobramycin",
-    "Trimethoprim/Sulfamethoxazole",
-    "Vancomycin",
+    "amikacin",
+    "ampicillin",
+    "ampicillin/sulbactam",
+    "aztreonam",
+    "cefazolin",
+    "cefepime",
+    "cefoxitin",
+    "ceftazidime",
+    "ceftriaxone",
+    "cefuroxime sodium",
+    "ciprofloxacin",
+    "gentamicin",
+    "imipenem",
+    "levofloxacin",
+    "meropenem",
+    "nitrofurantoin",
+    "piperacillin/tazobactam",
+    "tetracycline",
+    "tobramycin",
+    "trimethoprim/sulfamethoxazole",
+    "vancomycin",
 ]
 ANTIBIOTIC_FILE = "data/anti_rel"
 FEATURE_DIR = "data/features"

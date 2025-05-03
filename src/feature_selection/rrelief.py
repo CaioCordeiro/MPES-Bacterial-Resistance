@@ -210,7 +210,7 @@ class RReliefF(FeatureSelectionInterface):
 
         # Get top N feature names
         top_features = (
-            self.feature_scores_.sort_values(ascending=False).index[:n_select].tolist()
+            self.feature_scores_.sort_values(ascending=False).tolist()
         )
 
         # Check if input data has the required columns
@@ -292,7 +292,8 @@ class RReliefF(FeatureSelectionInterface):
         # --- Select Features or Return Scores ---
         if self.n_features_to_select is not None:
             # User wants feature selection, call the selection helper
-            return self._select_features(data)
+            ranked_features = self.feature_scores_.sort_values(ascending=False).index.tolist()
+            return ranked_features
         else:
             # User wants scores, return the scores DataFrame
             result_df = pd.DataFrame(self.feature_scores_)  # Already a Series
@@ -300,4 +301,5 @@ class RReliefF(FeatureSelectionInterface):
             result_df.index.name = "Feature"
             # Sort by score descending for clarity
             result_df = result_df.sort_values(by="Score", ascending=False)
-            return result_df
+            ranked_features = self.feature_scores_.sort_values(ascending=False).index.tolist()
+            return ranked_features

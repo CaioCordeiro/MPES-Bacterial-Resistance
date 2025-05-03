@@ -1,21 +1,18 @@
 import os
 import sys
 import warnings
+import os.path
 from typing import List, Optional
 
 import pandas as pd
 from pandas import DataFrame
 from sklearn.model_selection import train_test_split
 
-import constants.constants as const  # Correct import path
-from data_providers.genetic_data.dataset_cache_manager import \
-    DatasetCacheManager
+from constants import constants as const
 from data_providers.genetic_data.genetic_data_downloader import SraDownloader
-from data_providers.genetic_data.genetic_dataset_generator import \
-    DatasetGenerator  # Assuming this class generates the final dataset DataFrame
+from data_providers.genetic_data.genetic_dataset_generator import DatasetGenerator
 from data_providers.genetic_data.kmer_extrator import KmerExtractor
-from data_providers.genetic_data.utils import \
-    create_folder  # Assuming create_folder is in utils.py
+from data_providers.genetic_data.utils import create_folder
 from entities.interfaces.dataset import DatasetInterface
 from utils.logging_config import get_logger
 
@@ -29,7 +26,8 @@ class GeneticDataset(DatasetInterface):
         self,
         sra_ids: Optional[List[str]] = None,
         exclude_ids: List[str] = const.EXCLUDE_LIST,
-        raw_data_output: str = const.FILE_DIR,
+        root_dir: str = const.ROOT_DIR,
+        raw_data_output: str = "data/raw_data",
         kmer_size: int = const.K_SIZE,
         feature_output: str = const.FEATURE_DIR,
         dataset_output: str = const.DATASET_OUTPUT_DIR,
@@ -42,6 +40,7 @@ class GeneticDataset(DatasetInterface):
         Initializes the GeneticDataset.
 
         Args:
+            root_dir: The root directory for all other files.
             sra_ids: List of SRA IDs to process.
             exclude_ids: List of SRA IDs to exclude.
             raw_data_output: Directory to save raw genetic data.
@@ -53,6 +52,7 @@ class GeneticDataset(DatasetInterface):
             metric_provider: Optional object to provide metrics.
         """
         super().__init__(raw_data=None, name=name, metric_provider=metric_provider)
+        self.root_dir = root_dir
         self.bac_name = bac_name
         self.logger = get_logger()
         self.max_sra_ids = max_sra_ids
@@ -60,14 +60,11 @@ class GeneticDataset(DatasetInterface):
             sra_ids if sra_ids is not None else self._get_sra_ids_from_relation_file()
         )
         self.exclude_ids = exclude_ids
-        self.raw_data_output_dir = raw_data_output + "/" + self.bac_name
+        self.raw_data_output_dir = os.path.join(self.root_dir, raw_data_output, self.bac_name)
         self.kmer_size = kmer_size
-        self.feature_output_dir = feature_output + "/" + self.bac_name
-        self.dataset_output_dir = dataset_output + "/" + self.bac_name
+        self.feature_output_dir = os.path.join(self.root_dir, feature_output, self.bac_name)
+        self.dataset_output_dir = os.path.join(self.root_dir, dataset_output, self.bac_name)
         self._treated_data: DataFrame = None
-        self.cache_manager = DatasetCacheManager(
-            cache_dir=const.CACHE_DIR, bac_name=self.bac_name
-        )
         create_folder(self.raw_data_output_dir)
         create_folder(self.feature_output_dir)
         create_folder(self.dataset_output_dir)
@@ -108,15 +105,13 @@ class GeneticDataset(DatasetInterface):
             )
             return
 
-        # Check if dataset already exists in cache
-        if self.cache_manager.dataset_exists():
-            return
         self.logger.info("Fetching raw genetic data from SRA...")
         downloader = SraDownloader(
             sra_id_list=self.sra_ids,
             exclude_list=self.exclude_ids,
             bac_name=self.bac_name,
             max_sra_ids=self.max_sra_ids,
+            root_dir=self.root_dir,
         )
         downloader.download()
         self.logger.info("Raw genetic data fetching finished.")
@@ -135,11 +130,8 @@ class GeneticDataset(DatasetInterface):
             )
             return
 
-        # Check if dataset already exists in cache
-        if self.cache_manager.dataset_exists():
-            return
         self.logger.info("Extracting k-mer features...")
-        extractor = KmerExtractor(k_size=self.kmer_size, bac_name=self.bac_name)
+        extractor = KmerExtractor(k_size=self.kmer_size, bac_name=self.bac_name, root_dir=self.root_dir)
         extractor.process_sequences()
         self.logger.info("K-mer feature extraction finished.")
 
@@ -147,23 +139,14 @@ class GeneticDataset(DatasetInterface):
         """
         Generates the combined dataset DataFrame by reading feature files and MIC data.
         """
-        # Try to load from cache first
-        cached_df = self.cache_manager.load_dataset()
-        if cached_df is not None:
-            self.logger.info(f"Loaded dataset from cache for {self.bac_name}")
-            self._treated_data = cached_df
-            return self._treated_data
-
         self.logger.info("Generating the combined dataset DataFrame...")
         generator = DatasetGenerator(
             feature_dir=self.feature_output_dir,
             k_size=self.kmer_size,
             output_dir=self.dataset_output_dir,
             bac_name=self.bac_name,
+            root_dir=self.root_dir,
         )
-        # Modify DatasetGenerator to return the DataFrame instead of saving to a file
-        # This might require changes in the DatasetGenerator class.
-        # For now, assuming it saves and we load it.
         generator.generate_dataset()  # This will save the CSV
         list_of_files = [
             os.path.join(self.dataset_output_dir, f)
@@ -192,6 +175,7 @@ class GeneticDataset(DatasetInterface):
                 k_size=self.kmer_size,
                 output_dir=self.dataset_output_dir,
                 bac_name=self.bac_name,
+                root_dir=self.root_dir,
             )
             generator.generate_dataset()
             df = pd.read_csv(latest_file)
@@ -200,8 +184,6 @@ class GeneticDataset(DatasetInterface):
 
         self._treated_data = DataFrame(df)
 
-        # Cache the dataset for future use
-        self.cache_manager.save_dataset(self._treated_data)
         self.logger.info("Combined dataset DataFrame generated.")
         return self._treated_data
 
@@ -212,16 +194,10 @@ class GeneticDataset(DatasetInterface):
         Fetches, extracts, and generates the dataset if it hasn't been created yet.
         """
         if self._treated_data is None:
-            # Try to load from cache first
-            cached_df = self.cache_manager.load_dataset()
-            if cached_df is not None:
-                self.logger.info(f"Loaded dataset from cache for {self.bac_name}")
-                self._treated_data = cached_df
-            else:
-                self._fetch_raw_data()
-                self._extract_features()
-                self._treated_data = self._generate_combined_dataset()
-        return self._treated_data
+            self._fetch_raw_data()
+            self._extract_features()
+            self._treated_data = self._generate_combined_dataset()
+        return self._treated_data.dropna()
 
     def splitted_dataset(
         self, test_size: float, random_state: int = None
