@@ -26,7 +26,7 @@ class GeneticDataset(DatasetInterface):
         self,
         sra_ids: Optional[List[str]] = None,
         exclude_ids: List[str] = const.EXCLUDE_LIST,
-        root_dir: str = const.ROOT_DIR,
+        root_dir: str = '',
         raw_data_output: str = "data/raw_data",
         kmer_size: int = const.K_SIZE,
         feature_output: str = const.FEATURE_DIR,

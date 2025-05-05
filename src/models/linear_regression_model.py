@@ -72,49 +72,26 @@ class LinearRegressionModel:
             LinearRegressionModel: The fitted model instance.
         """
         self.X_columns = X.columns.tolist()
-
-        # Check memory before proceeding
-        memory_percent = psutil.virtual_memory().percent
-        if memory_percent > 80:  # More than 80% memory used
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Using simplified model fitting."
-            )
-            # Use simplified parameter grid for high memory usage
-            if self._param_grid:  # Check if param_grid is not empty
-                self._param_grid = {
-                    param: grid[:2] for param, grid in self._param_grid.items() if grid
-                }  # Ensure grid is not empty
-
         # Standardize features
         # self.scaler = StandardScaler() # Moved scaler initialization to __init__
         X_scaled = self.scaler.fit_transform(X.values)
-
-        if self.model_type == "linear":
-            self.model = LinearRegression()
-            self.model.fit(X_scaled, y)
-            self.best_params_ = {}  # No hyperparameters tuned
-        elif self.model_type in ["ridge", "lasso", "elastic_net"]:
-            # Use GridSearchCV for hyperparameter tuning with memory-efficient settings
-            grid_search = GridSearchCV(
+        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+        grid_search = GridSearchCV(
                 estimator=self._get_model_instance(),
                 param_grid=self._param_grid,
-                scoring="neg_mean_squared_error",
+                scoring="",
                 cv=self.cv,
                 return_train_score=True,
                 n_jobs=2,  # Limit to 2 cores to reduce memory usage
                 verbose=0,  # Reduce verbosity to minimize output
             )
-            grid_search.fit(X_scaled, y)
 
-            self.best_model = grid_search.best_estimator_
-            self.best_params_ = grid_search.best_params_  # Store the best parameters
-            self.model = self.best_model
-        else:
-            raise ValueError(
-                f"Invalid model type: {self.model_type}. Supported types are 'linear', 'ridge', 'lasso', 'elastic_net'."
-            )
-
-        self._update_summary(X, y)  # Pass original X for scaling within summary update
+        # split the data into training and validation sets
+        grid_search.fit(X_train, y_train)
+        self.best_model = grid_search.best_estimator_
+        self.best_params_ = grid_search.best_params_  # Store the best parameters
+        self.model = self.best_model
+        self._update_summary(X_test, y_test)  # Pass original X for scaling within summary update
         return self
 
     def _get_model_instance(self) -> Union[Ridge, Lasso, ElasticNet]:
@@ -200,21 +177,27 @@ class LinearRegressionModel:
             return
 
         # Ensure X has the same columns as during fitting, in the same order
-        X_aligned = X[self.X_columns]
-        X_scaled = self.scaler.transform(X_aligned.values)
-
-        y_pred = self.model.predict(X_scaled)
-        mse = mean_squared_error(y, y_pred)
-        r2 = r2_score(y, y_pred)
+        y_pred = self.model.predict(X)
+        metrics = {}
+        # Ensure y is suitable for classification metrics (e.g., integer labels)
+        metrics["accuracy"] = accuracy_score(y, y_pred)
+        # Use average='weighted' for multiclass or if classes are imbalanced
+        # Use average='binary' if strictly binary and want score for positive class
+        metrics["f1_score"] = f1_score(
+            y, y_pred, average="weighted", zero_division=0
+        )
+        # Cast all arrays inside confusion matrix to list
+        # This is necessary for JSON serialization
+        confusion_matrix_result = confusion_matrix(y, y_pred)
+        metrics["confusion_matrix"] = confusion_matrix_result.tolist()
 
         self._summary = {
             "model_type": self.model_type,
+            "scoring": self.scoring,  # Store the scoring used
             "best_params": self.best_params_,
-            "mean_squared_error": mse,
-            "r2_score": r2,
             "n_features": len(self.X_columns),
             "status": "Fitted",
-            "confusion_matrix": [],  # Linear regression does not have a confusion matrix
+            **metrics,  # Add calculated metrics
         }
 
         if hasattr(self.model, "coef_"):

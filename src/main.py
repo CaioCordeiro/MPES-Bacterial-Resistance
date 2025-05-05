@@ -7,13 +7,15 @@ import numpy as np  # Make sure this is imported
 
 from data_providers.genetic_data.genetic_data import \
     GeneticDataset  # Make sure this is imported
-from models.linear_regression_model import \
-    LinearRegressionModel  # Make sure this is imported
+from models.logistic_regression_model import \
+    LogisticRegressionModel  # Make sure this is imported
 from models.svm import SupportVectorMachineModel
+
 from feature_selection.pearson_correlation import \
     PearsonCorrelationSelector  # Make sure this is imported
 from feature_selection.banzaff_power_index import BanzhafFeatureSelector
 from feature_selection.shap_feature_selector import ShapFeatureSelector
+from feature_selection.rrelief import RReliefF
 from pipeline.pipeline import Pipeline
 from runs.run_results import \
     save_final_results  # Import if saving here instead of Pipeline
@@ -58,192 +60,66 @@ def prepare_all_datasets(bacteria_list, max_sra_ids):
     return prepared_datasets
 
 
-# --- End Placeholder Functions ---
+def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = None):
+    """
+    Plots metrics for each combination of model and feature selector for a given bacteria.
+    Saves a separate plot for each (model, feature selector, bacteria) combination.
+    """
+    import os
 
-
-# --- Modify plot_results if needed based on the new dictionary structure ---
-def plot_results(results: List[Dict[str, Any]], title: str):
-    # Filter out failed runs if necessary
-    # Ensure 'scores' exist and are not empty lists
-    successful_results = [
-        r
-        for r in results
-        if r.get("status") == "Success" and r.get("scores") and len(r["scores"]) > 0
-    ]
-    if not successful_results:
-        print(f"No successful results with valid scores to plot for {title}")
-        return
-
-    # Ensure 'n_features_requested' exists
-    feature_ranges = sorted(
-        list(
-            set(
-                r["n_features_requested"]
-                for r in successful_results
-                if "n_features_requested" in r
-            )
-        )
-    )
-    models = sorted(
-        list(set(r["model_class"] for r in successful_results if "model_class" in r))
-    )
-    feature_selectors = sorted(
-        list(
-            set(
-                r["feature_selector_class"]
-                for r in successful_results
-                if "feature_selector_class" in r
-            )
-        )
-    )
-
-    # Determine subplot layout
-    n_rows = len(models)
-    n_cols = len(feature_selectors)
-    if n_rows == 0 or n_cols == 0:
-        print("No models or feature selectors found in results.")
-        return
-
-    fig, axes = plt.subplots(
-        n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False
-    )  # Ensure axes is always 2D
-    fig.suptitle(title, fontsize=16)
-
-    for i, model in enumerate(models):
-        for j, fs in enumerate(feature_selectors):
-            ax = axes[i, j]
-            # Collect scores for this specific model/fs combination across feature counts
-            plot_data = {}
-            for n_features in feature_ranges:
-                # Get scores for this specific point (model, fs, n_features)
-                # Ensure all keys exist before accessing
-                scores_list = [
-                    r["scores"]
-                    for r in successful_results
-                    if r.get("model_class") == model
-                    and r.get("feature_selector_class") == fs
-                    and r.get("n_features_requested") == n_features
-                ]
-                # scores_list will be a list of lists (one list per run configuration)
-                # We need to flatten it or handle the boxplot input correctly
-                # Boxplot expects a list of score lists, one for each box
-                if scores_list:
-                    # Assuming scores is a list of floats from cross-validation
-                    # If multiple runs had the exact same config (unlikely here),
-                    # scores_list might have multiple inner lists. Boxplot handles this.
-                    # Check if the first list of scores is not empty before adding
-                    if scores_list[0]:
-                        plot_data[n_features] = scores_list[
-                            0
-                        ]  # Take the first list if only one run per config point
-
-            if plot_data:
-                # Prepare data for boxplot: list of score lists, positions
-                bp_data = [plot_data[n] for n in feature_ranges if n in plot_data]
-                bp_positions = [n for n in feature_ranges if n in plot_data]
-                if bp_data:
-                    # Handle case where there's only one box
-                    box_widths = 1.0  # Default width for a single box
-                    if len(bp_positions) > 1:
-                        # Calculate widths based on differences, handle potential zero diff
-                        diffs = np.diff(bp_positions)
-                        if len(diffs) > 0 and np.all(diffs > 0):
-                            box_widths = min(diffs) * 0.5
-                        elif (
-                            len(diffs) > 0
-                        ):  # If diffs exist but some are zero or negative (unlikely for range)
-                            box_widths = (
-                                np.mean(diffs[diffs > 0]) * 0.5
-                                if np.any(diffs > 0)
-                                else 1.0
-                            )
-                        # else: keep default width
-
-                    ax.boxplot(
-                        bp_data,
-                        positions=bp_positions,
-                        widths=box_widths,
-                        showfliers=False,
-                    )  # Hide outliers for cleaner plot
-                    ax.set_xticks(feature_ranges)  # Ensure all ticks are shown
-                    ax.set_xticklabels(feature_ranges)
-                else:
-                    ax.text(
-                        0.5,
-                        0.5,
-                        "No Data",
-                        horizontalalignment="center",
-                        verticalalignment="center",
-                        transform=ax.transAxes,
-                    )
-
-            else:
-                ax.text(
-                    0.5,
-                    0.5,
-                    "No Data",
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    transform=ax.transAxes,
-                )
-
-            ax.set_title(f"{model} - {fs}", fontsize=10)
-            ax.set_xlabel("Number of Features", fontsize=8)
-            # Determine Y-axis label based on scoring (assuming neg_mean_squared_error)
-            # You might need to adjust this if using different scoring
-            y_label = "CV Score (neg_mean_squared_error)"
-            ax.set_ylabel(y_label, fontsize=8)
-            ax.tick_params(axis="both", which="major", labelsize=8)
-            ax.grid(True, linestyle="--", alpha=0.6)  # Add grid for readability
-
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to prevent title overlap
-    # Save the plot instead of showing directly if running non-interactively
-    # Sanitize title for filename
-    safe_title = "".join(c if c.isalnum() else "_" for c in title)
-    plot_filename = f"results_plot_{safe_title}.png"
-    try:
-        plt.savefig(plot_filename)
-        print(f"Plot saved to {plot_filename}")
-    except Exception as e:
-        print(f"Error saving plot {plot_filename}: {e}")
-    plt.close(fig)  # Close the figure to free memory
-    # plt.show() # Comment out if running in a non-GUI environment
-
-
-def plot_metrics(results: List[Dict[str, Any]], bacteria: str):
-    metrics = {
-        "f1_score": [],
-        "accuracy": [],
-        "n_features": []
-    }
-
+    # Group results by (model, feature selector)
+    grouped = {}
     for result in results:
         if result.get("bacteria") == bacteria:
+            model_name = result.get("model_class", "UnknownModel")
+            fs_name = result.get("feature_selector_class", "NoFS")
+            key = (model_name, fs_name)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(result)
+
+    for (model_name, fs_name), group_results in grouped.items():
+        metrics = {
+            "f1_score": [],
+            "accuracy": [],
+            "n_features": [],
+            "scores": [],
+        }
+        for result in group_results:
             metrics["n_features"].append(result.get("n_features_requested"))
-            metrics["f1_score"].append(result.get("model_summary", {}).get("f1_score", 0))
-            metrics["accuracy"].append(result.get("model_summary", {}).get("accuracy", 0))
+            metrics["f1_score"].append(result.get("test_f1_score", 0))
+            metrics["accuracy"].append(result.get("test_accuracy", 0))
+            metrics["scores"].append(
+                np.mean(result.get("scores", [])) if result.get("scores") else 0
+            )
 
-    feature_sizes = sorted(set(metrics["n_features"]))
-    
-    plt.figure(figsize=(10, 6))
-    
-    # Plot F1 Score
-    plt.plot(feature_sizes, [metrics["f1_score"][metrics["n_features"].index(n)] for n in feature_sizes], marker='o', label='F1 Score')
-    
-    # Plot Accuracy
-    plt.plot(feature_sizes, [metrics["accuracy"][metrics["n_features"].index(n)] for n in feature_sizes], marker='o', label='Accuracy')
+        feature_sizes = sorted(set(metrics["n_features"]))
+        plt.figure(figsize=(10, 6))
+        # Plot F1 Score
+        plt.plot(
+            feature_sizes,
+            [metrics["f1_score"][metrics["n_features"].index(n)] for n in feature_sizes],
+            marker='o',
+            label='F1 Score'
+        )
+        # Plot Accuracy
+        plt.plot(
+            feature_sizes,
+            [metrics["accuracy"][metrics["n_features"].index(n)] for n in feature_sizes],
+            marker='o',
+            label='Accuracy'
+        )
 
-    plt.title(f'Metrics for {bacteria}')
-    plt.xlabel('Number of Features')
-    plt.ylabel('Metric Value')
-    plt.legend()
-    plt.grid()
-    
-    plt.savefig(f'{bacteria}_metrics.jpg')
-    plt.close()
-
-    print(f"Metrics plot saved for {bacteria} as {bacteria}_metrics.jpg")
-
+        plt.title(f'{bacteria} - {model_name} - {fs_name}')
+        plt.xlabel('Number of Features')
+        plt.ylabel('Metric Value')
+        plt.legend()
+        plt.grid()
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        filename = f"{timestamp}_{bacteria}_{model_name}_{fs_name}_metrics.jpg"
+        plt.savefig(filename)
+        plt.close()
+        print(f"Metrics plot saved for {bacteria}, {model_name}, {fs_name} as {filename}")
 
 def main():
     # --- Argument Parser Setup --- <<< ADD THIS SECTION
@@ -282,16 +158,20 @@ def main():
 
     bacteria_list = args.bacteria
     # Define models and feature selectors (ensure they are lists of classes)
-    models_to_run = [SupportVectorMachineModel]  # Add others like SVC if needed
+    models_to_run = [
+                    SupportVectorMachineModel, 
+                     LogisticRegressionModel
+                     ]  # Add others like SVC if needed
     feature_selectors_to_run = [
-        # PearsonCorrelationSelector,
+        PearsonCorrelationSelector,
         # BanzhafFeatureSelector,
-        ShapFeatureSelector
+        ShapFeatureSelector,
+        RReliefF
     ]  # Add others like RReliefF if needed
 
     # Use a smaller range for faster testing initially
     # feature_range_to_run = range(5, 11, 5) # e.g., 5, 10
-    feature_range_to_run = range(5, 200, 10)  # Original range
+    feature_range_to_run = range(5, 1023, 10)  # Original range
     target_antibiotic = "ciprofloxacin"  # Or get from args
     # Create a more robust results filename
     timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -301,7 +181,8 @@ def main():
     if not prepared_datasets:
         logger.error("No valid bacteria datasets available. Exiting.")
         return
-
+    # Paralelize the pipeline run
+    
     pipeline = Pipeline(
         prepared_datasets=prepared_datasets,
         bacteria_list=[
@@ -320,17 +201,19 @@ def main():
     # Results are already saved by pipeline.run_all()
     # If you need the results list here, you can access it:
     final_results = pipeline.all_results
-    logger.info(f"Pipeline finished. Results saved to {results_file}")
+    # print(final_results)
+    # logger.info(f"Pipeline finished. Results saved to {results_file}")
 
     # Plot results for each bacteria
     for bac in bacteria_list:
         if bac in prepared_datasets:  # Only plot for bacteria that were processed
             bac_results = [r for r in final_results if r.get("bacteria") == bac]
+            print(bac_results)
             if bac_results:
-                plot_results(
-                    bac_results,
-                    f"Results for {bac.upper()} - Target: {target_antibiotic}",
-                )
+                # plot_results(
+                #     bac_results,
+                #     f"Results for {bac.upper()} - Target: {target_antibiotic}",
+                # )
                 plot_metrics(bac_results, bac)  # Call to plot metrics
             else:
                 logger.warning(f"No results found to plot for bacteria: {bac}")

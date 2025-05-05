@@ -7,7 +7,7 @@ from sklearn.linear_model import LinearRegression as SklearnLinearRegression
 from sklearn.svm import SVC
 
 from data_providers.genetic_data.genetic_data import GeneticDataset
-from models.linear_regression_model import LinearRegressionModel
+from models.logistic_regression_model import LogisticRegressionModel
 from models.svm import SupportVectorMachineModel
 from feature_selection.banzaff_power_index import BanzhafFeatureSelector
 from feature_selection.shap_feature_selector import ShapFeatureSelector
@@ -29,7 +29,7 @@ class Pipeline:
         prepared_datasets: Dict[str, GeneticDataset] = None,
         bacteria_list: List[str] = None,
         models: List[
-            Union[Type[SVC], Type[SklearnLinearRegression], Type[LinearRegressionModel]]
+            Union[Type[SVC], Type[SklearnLinearRegression], Type[LogisticRegressionModel]]
         ] = None,
         feature_selectors: List[Type] = None,
         feature_range: range = range(5, 36, 5),
@@ -39,7 +39,7 @@ class Pipeline:
     ):
         self.prepared_datasets = prepared_datasets or {}
         self.bacteria_list = bacteria_list or ["sa", "ech", "kleb"]
-        self.models = models if models is not None else [SVC, LinearRegressionModel]
+        self.models = models if models is not None else [SVC, LogisticRegressionModel]
         self.feature_selectors = (
             feature_selectors
             if feature_selectors is not None
@@ -78,7 +78,14 @@ class Pipeline:
         Feature selection is performed once per model and feature selector combination.
         """
         self.logger.info(f"Running pipeline for {bac}...")
-
+        df = data.treated_data.copy()
+        anti_list_without_target = const.ANTIBIOTIC_LIST.copy()
+        if self.target_antibiotic in anti_list_without_target:
+            anti_list_without_target.remove(
+                self.target_antibiotic
+            )
+        df = df.drop(anti_list_without_target, axis=1, errors="ignore")
+                
         for ModelClass in self.models:
             # Train the model once if SHAP is used
             trained_model = None
@@ -86,14 +93,6 @@ class Pipeline:
             for FSClass in self.feature_selectors:
                 # Perform feature selection
                 try:
-                    df = data.treated_data.copy()
-                    anti_list_without_target = const.ANTIBIOTIC_LIST.copy()
-                    if self.target_antibiotic in anti_list_without_target:
-                        anti_list_without_target.remove(
-                            self.target_antibiotic
-                        )
-                    df = df.drop(anti_list_without_target, axis=1, errors="ignore")
-
                     if FSClass == ShapFeatureSelector:
                         # Train the model if not already trained
                         fs_instance = FSClass(model=ModelClass())
@@ -119,7 +118,12 @@ class Pipeline:
 
                 # Train models with different numbers of features
                 for n_features in self.feature_range:
+                    # Get top n features
                     selected_features = ranked_features[:n_features]
+                    self.logger.info(
+                        f"Running {ModelClass.__name__} with {FSClass.__name__} "
+                        f"for {bac} using {n_features} features."
+                    )
                     # reduced_data = data.treated_data[
                     #     selected_features + [self.target_antibiotic]
                     # ]
@@ -136,13 +140,7 @@ class Pipeline:
         logger = get_logger()
         try:
             # Instantiate the model
-            if ModelClass == LinearRegressionModel:
-                model = ModelClass(model_type="ridge")
-            elif issubclass(ModelClass, (SupportVectorMachineModel, SklearnLinearRegression)):
-                model = ModelClass()
-            else:
-                logger.error(f"Unsupported model class: {ModelClass.__name__}")
-                return
+            model = ModelClass()
             # Train the model
             run = GeneticDataRun(
                 data=data,

@@ -3,7 +3,7 @@
 import os
 import sys
 import warnings
-
+from typing import List
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
@@ -50,7 +50,7 @@ class PearsonCorrelationSelector(FeatureSelectionInterface):
         self.feature_names_in_ = None
         self._scores_calculated = False
 
-    def fit(self, data: DataFrame, target_column: str) -> DataFrame:
+    def fit(self, data: DataFrame, target_column: str) -> List[str]:
         """
         Calculates Pearson correlation scores and optionally selects features.
 
@@ -59,13 +59,8 @@ class PearsonCorrelationSelector(FeatureSelectionInterface):
             target_column (str): Name of the target variable column.
 
         Returns:
-            DataFrame:
-                - If `n_features_to_select` was set during initialization:
-                  Returns the input DataFrame containing only the selected top features
-                  (plus the target column and any other non-feature columns).
-                - If `n_features_to_select` was None:
-                  Returns a DataFrame with features as index and their calculated
-                  absolute Pearson correlation scores as a column named 'Score'.
+            Listr[str]: List of feature names sorted by their absolute correlation
+            with the target variable in descending order.
         """
         # --- Input Validation and Preparation ---
         if target_column not in data.columns:
@@ -90,14 +85,18 @@ class PearsonCorrelationSelector(FeatureSelectionInterface):
         # Handle potential NaNs resulting from constant columns or other issues
         self.feature_scores_ = X.corrwith(y).abs().fillna(0.0)
         self._scores_calculated = True
+        # Sort features by scores in descending order
+        ranked_features = self.feature_scores_.sort_values(ascending=False)
         self.logger.warning(
             f"Done running correlation for {len(self.feature_names_in_)}"
         )
-        # Select features if n_features_to_select is specified
-        if self.n_features_to_select is not None:
-            return self._select_features(data)
+        # return the full list of ranked features with only the feature names
+        self.ranked_features_ = ranked_features.index.tolist()
+        self.logger.info(
+            f"Feature ranking completed. Top features: {self.ranked_features_[:10]}"
+        )
+        return self.ranked_features_
 
-        return self.feature_scores_
 
     def _select_features(self, data: DataFrame) -> DataFrame:
         """

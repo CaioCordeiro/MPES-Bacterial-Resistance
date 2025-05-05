@@ -2,7 +2,7 @@
 # (Save this in your models directory)
 
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
 import psutil
@@ -96,34 +96,8 @@ class SupportVectorMachineModel:
         self.X_columns = X.columns.tolist()
         self._X = X  # Store the original X
         self._y = y  # Store the original y
-
-        # Check memory before proceeding
-        memory_percent = psutil.virtual_memory().percent
-        if memory_percent > 80:  # More than 80% memory used
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Using simplified model fitting."
-            )
-            # Use simplified parameter grid for high memory usage
-            temp_grid = {}
-            for param, grid in self._param_grid.items():
-                if grid:  # Ensure grid is not empty
-                    # Take fewer values, prioritize simpler options
-                    if param == "kernel":
-                        temp_grid[param] = (
-                            list(set(["linear", "rbf"]) & set(grid)) or grid[:1]
-                        )
-                    elif param == "C":
-                        temp_grid[param] = grid[:1]  # Just one C value
-                    elif param == "gamma":
-                        temp_grid[param] = list(set(["scale"]) & set(grid)) or grid[:1]
-                    else:  # e.g., class_weight
-                        temp_grid[param] = grid[:1]
-            self._param_grid = temp_grid
-            self.logger.debug(f"Simplified param grid: {self._param_grid}")
-
-        # Standardize features (crucial for SVM)
-        X_scaled = self.scaler.fit_transform(X.values)
-
+        # Separate in train and test sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         # Use GridSearchCV for hyperparameter tuning
         grid_search = GridSearchCV(
             estimator=self._get_model_instance(),
@@ -136,7 +110,7 @@ class SupportVectorMachineModel:
             error_score="raise",  # Raise error if a combination fails
         )
         try:
-            grid_search.fit(X_scaled, y)
+            grid_search.fit(X_train, y_train)
         except Exception as e:
             self.logger.error(f"GridSearchCV failed for SVM: {e}", exc_info=True)
             self._summary = {"status": "Fit Failed", "error": str(e)}
@@ -146,7 +120,7 @@ class SupportVectorMachineModel:
             )
             try:
                 self.model = self._get_model_instance()
-                self.model.fit(X_scaled, y)
+                self.model.fit(X_train, y_train)
                 self.best_params_ = self.model.get_params()  # Store default params
                 self.best_model = self.model
                 self.logger.info("Fallback SVM fitting with defaults succeeded.")
@@ -165,7 +139,7 @@ class SupportVectorMachineModel:
         # Only update summary if model fitting was successful (either gridsearch or fallback)
         if self.model:
             self._update_summary(
-                X, y
+                X_test, y_test
             )  # Pass original X for scaling within summary update
         return self
 
@@ -176,7 +150,7 @@ class SupportVectorMachineModel:
         if self.model_type == "svc":
             # probability=True allows predict_proba but slows down training.
             # Add if needed, otherwise keep False for speed.
-            return SVC(probability=False)
+            return SVC()
         elif self.model_type == "svr":
             # Consider adding cache_size modification for memory if needed
             return SVR()
@@ -200,46 +174,13 @@ class SupportVectorMachineModel:
                                      scoring metric, or None if model not fitted or CV fails.
         """
         if self.model is None:
-            self.logger.error(
-                "Model has not been fitted yet. Call fit() before cross_validate()."
-            )
-            return None
-        if self.X_columns is None:
-            self.logger.error(
-                "Model has not been fitted with column information. Call fit() first."
-            )
-            return None
-
-        # Check memory before cross-validation
-        memory_percent = psutil.virtual_memory().percent
-        effective_cv = cv
-        if memory_percent > 80:  # More than 80% memory used
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Using reduced cross-validation."
-            )
-            effective_cv = min(cv, 3)  # Use fewer folds
-
-        # Ensure X has the same columns as during fitting, in the same order
-        try:
-            X_aligned = X[self.X_columns]
-        except KeyError as e:
-            missing_cols = set(self.X_columns) - set(X.columns)
-            extra_cols = set(X.columns) - set(self.X_columns)
-            self.logger.error(
-                f"Input columns mismatch for cross_validate. Missing: {missing_cols}, Extra: {extra_cols}"
-            )
-            raise ValueError(
-                f"Input columns mismatch. Missing: {missing_cols}, Extra: {extra_cols}"
-            ) from e
-
-        X_scaled = self.scaler.transform(X_aligned.values)
-
+            self.model = self._get_model_instance()
         try:
             scores = cross_val_score(
                 self.model,  # Use the best model found by fit()
-                X_scaled,
+                X,
                 y,
-                cv=effective_cv,
+                cv=10,
                 scoring=self.scoring,  # Use the instance's scoring metric
                 n_jobs=2,  # Limit parallelism
             )
@@ -267,7 +208,7 @@ class SupportVectorMachineModel:
             }
         return self._summary
 
-    def _update_summary(self, X: pd.DataFrame, y: pd.Series) -> None:
+    def _update_summary(self, X_test, y_test) -> None:
         """
         Updates the model's performance summary after fitting.
         Calculates metrics relevant to the model_type (SVC or SVR).
@@ -279,11 +220,10 @@ class SupportVectorMachineModel:
             return
 
         # Ensure X has the same columns as during fitting, in the same order
-        X_aligned = X[self.X_columns]
-        X_scaled = self.scaler.transform(X_aligned.values)
+        X_aligned = X_test[self.X_columns]
 
         try:
-            y_pred = self.model.predict(X_scaled)
+            y_pred = self.model.predict(X_aligned)
         except Exception as e:
             self.logger.error(
                 f"Prediction failed during summary update: {e}", exc_info=True
@@ -302,19 +242,17 @@ class SupportVectorMachineModel:
         if self.model_type == "svc":
             try:
                 # Ensure y is suitable for classification metrics (e.g., integer labels)
-                y_true = self._y.astype(int)
-                metrics["accuracy"] = accuracy_score(y_true, y_pred)
+                metrics["accuracy"] = accuracy_score(y_test, y_pred)
                 # Use average='weighted' for multiclass or if classes are imbalanced
                 # Use average='binary' if strictly binary and want score for positive class
                 metrics["f1_score"] = f1_score(
-                    y_true, y_pred, average="weighted", zero_division=0
+                    y_test, y_pred, average="weighted", zero_division=0
                 )
                 # Cast all arrays inside confusion matrix to list
                 # This is necessary for JSON serialization
-                confusion_matrix_result = confusion_matrix(y_true, y_pred)
+                confusion_matrix_result = confusion_matrix(y_test, y_pred)
                 metrics["confusion_matrix"] = confusion_matrix_result.tolist()
 
-                # metrics["confusion_matrix"] = list(self.get_confusion_matrix())
             except Exception as e:
                 self.logger.error(f"Failed to calculate SVC metrics: {e}")
                 metrics["metrics_error"] = f"SVC metric calculation failed: {e}"
@@ -357,21 +295,6 @@ class SupportVectorMachineModel:
         if hasattr(self.model, "intercept_"):
             self._summary["intercept"] = self.model.intercept_.tolist()  # Convert to list for JSON serialization
 
-    def get_confusion_matrix(self) -> Optional[np.ndarray]:
-        """
-        Returns the confusion matrix of the SVC model.
-        """
-        if self.model is None or self.model_type != "svc":
-            return None
-
-        try:
-            y_pred = self.model.predict(self.scaler.transform(self._X.values))
-            y_true = self._y.astype(int)
-            return confusion_matrix(y_true, y_pred)
-        except Exception as e: 
-            self.logger.error(f"Error calculating confusion matrix: {e}", exc_info=True)
-            return []
-
     def get_best_params(self) -> Dict[str, Any]:
         """
         Returns the best hyperparameters found during GridSearchCV.
@@ -413,9 +336,8 @@ class SupportVectorMachineModel:
                 f"Input columns mismatch. Missing: {missing_cols}, Extra: {extra_cols}"
             ) from e
 
-        X_scaled = self.scaler.transform(X_aligned.values)
         try:
-            predictions = self.model.predict(X_scaled)
+            predictions = self.model.predict(X_aligned)
             return predictions
         except Exception as e:
             self.logger.error(f"Prediction failed: {e}", exc_info=True)
@@ -464,3 +386,4 @@ class SupportVectorMachineModel:
                 f"Feature importances (coefficients) are only available for kernel='linear'. Current kernel: {getattr(self.model, 'kernel', 'N/A')}."
             )
             return None
+

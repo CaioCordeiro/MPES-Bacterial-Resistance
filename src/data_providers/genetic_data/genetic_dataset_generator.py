@@ -264,7 +264,7 @@ class DatasetGenerator:
             cache_file = os.path.join(self.root_dir, self.cache_dir, f"{self.bac_name}_dataset.csv")
             if os.path.exists(cache_file):
                 self.logger.info(f"Using cached dataset for: {self.bac_name}")
-                df = pd.read_csv(cache_file, low_memory=False)
+                df = pd.read_csv(cache_file)
                 self._save_dataset(df)
                 return
 
