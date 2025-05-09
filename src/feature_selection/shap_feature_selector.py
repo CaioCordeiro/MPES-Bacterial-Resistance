@@ -7,7 +7,6 @@ from sklearn.utils.validation import check_is_fitted
 from typing import List, Optional
 from entities.interfaces.feature_selection import FeatureSelectionInterface
 
-
 class ShapFeatureSelector(FeatureSelectionInterface):
     """
     Performs feature ranking based on SHAP values.
@@ -45,6 +44,10 @@ class ShapFeatureSelector(FeatureSelectionInterface):
         # Separate features and target
         X = df.drop(columns=[target_column])
         y = df[target_column]
+        # Scale X data
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
         print("X shape:", X.shape)
         print("X columns:", X.columns)
         print("X head:\n", X.head())
@@ -75,11 +78,10 @@ class ShapFeatureSelector(FeatureSelectionInterface):
             if isinstance(data, np.ndarray):
                 data = pd.DataFrame(data, columns=X.columns)
             return fitted_model.predict(data)
-
+        sampled_X = shap.kmeans(X, 30).data
         # Calculate SHAP values
-        sampled_data = shap.kmeans(X_test, 100)
-        explainer = shap.KernelExplainer(model_predict, sampled_data)
-        shap_values = explainer(X)
+        explainer = shap.KernelExplainer(model_predict, sampled_X)
+        shap_values = explainer(sampled_X)
 
         # Compute mean absolute SHAP values for each feature
         feature_importance = np.abs(shap_values.values).mean(axis=0)

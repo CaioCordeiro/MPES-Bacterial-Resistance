@@ -5,7 +5,7 @@ import pandas as pd
 import psutil
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
-from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
+from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
 from utils.logging_config import get_logger
@@ -23,7 +23,7 @@ class LogisticRegressionModel:
     def __init__(
         self,
         param_grid: Optional[Dict[str, List]] = None,
-        cv: int = 5,
+        cv: int =  StratifiedKFold(n_splits=10, shuffle=True, random_state=42),
         scoring: str = "f1_weighted",
     ):
         self.param_grid = param_grid or {
@@ -44,22 +44,13 @@ class LogisticRegressionModel:
         self.X_columns = None
         self.model_type = "logistic_regression"
 
-        # Adjust CV parameters based on available memory
-        memory_percent = psutil.virtual_memory().percent
-        if memory_percent > 70:
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Using memory-efficient settings."
-            )
-            self.cv = 3
-
     def _get_model_instance(self) -> LogisticRegression:
         return LogisticRegression()
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "LogisticRegressionModel":
         self.X_columns = X.columns.tolist()
-        X_scaled = self.scaler.fit_transform(X.values)
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=0.2, random_state=42
+            X, y, test_size=0.2, random_state=42
         )
         grid_search = GridSearchCV(
             estimator=self._get_model_instance(),
@@ -97,14 +88,14 @@ class LogisticRegressionModel:
             self._update_summary(X_test, y_test)
         return self
 
-    def cross_validate(self, X: pd.DataFrame, y: pd.Series, cv: int = 5) -> np.ndarray:
+    def cross_validate(self, X: pd.DataFrame, y: pd.Series) -> np.ndarray:
         if self.model is None:
             self.model = self._get_model_instance()
         return cross_val_score(
             self.model,
             X,
             y,
-            cv=10,
+            cv=self.cv,
             scoring=self.scoring,
             n_jobs=2,
         )
@@ -114,10 +105,7 @@ class LogisticRegressionModel:
             raise RuntimeError("Model has not been fitted yet. Call fit() before predict().")
         if self.X_columns is None:
             raise RuntimeError("Model has not been fitted with column information. Call fit() first.")
-
-        X_aligned = X[self.X_columns]
-        X_scaled = self.scaler.transform(X_aligned.values)
-        return self.model.predict(X_scaled)
+        return self.model.predict(X)
 
     def get_summary(self) -> Dict[str, Any]:
         if self.model is None:
@@ -144,10 +132,6 @@ class LogisticRegressionModel:
             "status": "Fitted",
             **metrics,
         }
-        if hasattr(self.model, "coef_"):
-            self.feature_importances_ = self.model.coef_[0]
-        if hasattr(self.model, "intercept_"):
-            self._summary["intercept"] = self.model.intercept_
 
     def get_best_params(self) -> Dict[str, Any]:
         return self.best_params_

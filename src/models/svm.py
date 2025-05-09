@@ -8,7 +8,8 @@ import pandas as pd
 import psutil
 from sklearn.metrics import (  # Regression metrics for SVR; Classification metrics for SVC
     accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score)
-from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC, SVR  # Import SVR and SVC
 
@@ -33,7 +34,7 @@ class SupportVectorMachineModel:
         self,
         model_type: str = "svc",  # Default to Support Vector Classification
         param_grid: Dict[str, List] = None,
-        cv: int = 5,
+        cv: int =  StratifiedKFold(n_splits=10, shuffle=True, random_state=42),
         scoring: Optional[str] = None,  # Allow explicit scoring override
     ):
         if model_type not in ["svc", "svr"]:
@@ -73,14 +74,6 @@ class SupportVectorMachineModel:
         self.X_columns = None  # Initialize X_columns
         self._X = None  # Store the original X for confusion matrix
         self._y = None  # Store the original y for confusion matrix
-
-        # Adjust CV parameters based on available memory
-        memory_percent = psutil.virtual_memory().percent
-        if memory_percent > 70:  # If memory usage is high
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Using memory-efficient settings."
-            )
-            self.cv = 3  # Reduce cross-validation folds
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> "SupportVectorMachineModel":
         """
@@ -159,7 +152,7 @@ class SupportVectorMachineModel:
             raise ValueError(f"Invalid model_type: {self.model_type}")
 
     def cross_validate(
-        self, X: pd.DataFrame, y: pd.Series, cv: int = 5
+        self, X: pd.DataFrame, y: pd.Series
     ) -> Optional[np.ndarray]:
         """
         Performs cross-validation on the *best* fitted model.
@@ -174,13 +167,14 @@ class SupportVectorMachineModel:
                                      scoring metric, or None if model not fitted or CV fails.
         """
         if self.model is None:
+            print("New Model Instance")
             self.model = self._get_model_instance()
         try:
             scores = cross_val_score(
                 self.model,  # Use the best model found by fit()
                 X,
                 y,
-                cv=10,
+                cv=self.cv,
                 scoring=self.scoring,  # Use the instance's scoring metric
                 n_jobs=2,  # Limit parallelism
             )
@@ -239,30 +233,22 @@ class SupportVectorMachineModel:
 
         # --- Calculate Metrics Based on Model Type ---
         metrics = {}
-        if self.model_type == "svc":
-            try:
-                # Ensure y is suitable for classification metrics (e.g., integer labels)
-                metrics["accuracy"] = accuracy_score(y_test, y_pred)
-                # Use average='weighted' for multiclass or if classes are imbalanced
-                # Use average='binary' if strictly binary and want score for positive class
-                metrics["f1_score"] = f1_score(
-                    y_test, y_pred, average="weighted", zero_division=0
-                )
-                # Cast all arrays inside confusion matrix to list
-                # This is necessary for JSON serialization
-                confusion_matrix_result = confusion_matrix(y_test, y_pred)
-                metrics["confusion_matrix"] = confusion_matrix_result.tolist()
+        try:
+            # Ensure y is suitable for classification metrics (e.g., integer labels)
+            metrics["accuracy"] = accuracy_score(y_test, y_pred)
+            # Use average='weighted' for multiclass or if classes are imbalanced
+            # Use average='binary' if strictly binary and want score for positive class
+            metrics["f1_score"] = f1_score(
+                y_test, y_pred, average="weighted", zero_division=0
+            )
+            # Cast all arrays inside confusion matrix to list
+            # This is necessary for JSON serialization
+            confusion_matrix_result = confusion_matrix(y_test, y_pred)
+            metrics["confusion_matrix"] = confusion_matrix_result.tolist()
 
-            except Exception as e:
-                self.logger.error(f"Failed to calculate SVC metrics: {e}")
-                metrics["metrics_error"] = f"SVC metric calculation failed: {e}"
-        elif self.model_type == "svr":
-            try:
-                metrics["mean_squared_error"] = mean_squared_error(self._y, y_pred)
-                metrics["r2_score"] = r2_score(self._y, y_pred)
-            except Exception as e:
-                self.logger.error(f"Failed to calculate SVR metrics: {e}")
-                metrics["metrics_error"] = f"SVR metric calculation failed: {e}"
+        except Exception as e:
+            self.logger.error(f"Failed to calculate SVC metrics: {e}")
+            metrics["metrics_error"] = f"SVC metric calculation failed: {e}"
 
         # --- Base Summary ---
         self._summary = {
@@ -273,27 +259,6 @@ class SupportVectorMachineModel:
             "status": "Fitted",
             **metrics,  # Add calculated metrics
         }
-
-        # --- Feature Importances (Only for linear kernel) ---
-        if hasattr(self.model, "coef_") and self.model.kernel == "linear":
-            # coef_ shape is (1, n_features) for SVR, (n_classes-1, n_features) for SVC
-            self.feature_importances_ = self.model.coef_
-            # Store the first set of coefficients for simplicity in summary
-            # Note: For multi-class SVC, this only represents one boundary.
-            try:
-                self._summary["coefficients_preview"] = self.feature_importances_[0][
-                    :10
-                ].tolist()  # Preview first 10
-            except IndexError:
-                self.logger.warning(
-                    "Could not access coefficients for summary preview."
-                )
-        else:
-            self.feature_importances_ = None
-
-        # --- Intercept ---
-        if hasattr(self.model, "intercept_"):
-            self._summary["intercept"] = self.model.intercept_.tolist()  # Convert to list for JSON serialization
 
     def get_best_params(self) -> Dict[str, Any]:
         """

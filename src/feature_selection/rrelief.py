@@ -64,7 +64,7 @@ class RReliefF(FeatureSelectionInterface):
 
         self.n_neighbors = n_neighbors
         self.n_features_to_select = n_features_to_select
-        self.n_iterations = n_iterations
+        self.n_iterations = 100
         self.random_state = random_state
         self.feature_scores_ = None
         self.feature_names_in_ = None
@@ -86,16 +86,6 @@ class RReliefF(FeatureSelectionInterface):
         epsilon = np.finfo(float).eps
         self._feature_ranges = np.ptp(X_scaled, axis=0) + epsilon
         self._target_range = np.ptp(y_scaled) + epsilon
-
-        # Check memory before proceeding
-        memory_percent = psutil.virtual_memory().percent
-        if memory_percent > 80:  # More than 80% memory used
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Reducing sample size for RReliefF."
-            )
-            # Reduce sample size if memory is constrained
-            if self.n_iterations is None or self.n_iterations > 100:
-                self.n_iterations = min(100, n_samples)
 
         # Initialize scores
         self.feature_scores_ = np.zeros(n_features)
@@ -255,15 +245,15 @@ class RReliefF(FeatureSelectionInterface):
                 UserWarning,
             )
 
-        # Check memory before proceeding
-        memory_percent = psutil.virtual_memory().percent
-        if memory_percent > 80:  # More than 80% memory used
-            self.logger.warning(
-                f"High memory usage ({memory_percent}%). Using memory-efficient mode for RReliefF."
-            )
-            # Use a smaller subset of features if memory is constrained
-            if len(data.columns) > 1000:
-                data = data.iloc[:, :1000]  # Use only the first 1000 features
+        # # Check memory before proceeding
+        # memory_percent = psutil.virtual_memory().percent
+        # if memory_percent > 80:  # More than 80% memory used
+        #     self.logger.warning(
+        #         f"High memory usage ({memory_percent}%). Using memory-efficient mode for RReliefF."
+        #     )
+        #     # Use a smaller subset of features if memory is constrained
+        #     if len(data.columns) > 1000:
+        #         data = data.iloc[:, :1000]  # Use only the first 1000 features
 
         X = data.drop(columns=[target_column])
         y = data[target_column]

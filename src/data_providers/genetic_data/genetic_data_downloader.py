@@ -26,6 +26,7 @@ class SraDownloader:
         max_sra_ids: Optional[int] = None,
         bac_name: str = "kleb",
         max_concurrent_downloads: int = 3,
+        use_existing_files: bool = True,
     ):
         """
         Initializes the SraDownloader with a list of SRA IDs and optional
@@ -54,6 +55,7 @@ class SraDownloader:
         self.lock_dir = os.path.join(self.root_dir, self.cache_dir, "locks")
         self.bac_name = bac_name
         self.max_concurrent_downloads = max_concurrent_downloads
+        self.use_existing_files = use_existing_files  # New option to use existing files
         os.makedirs(os.path.join(self.root_dir, self.output_dir), exist_ok=True)
         os.makedirs(self.cache_dir, exist_ok=True)
         os.makedirs(self.lock_dir, exist_ok=True)
@@ -106,8 +108,8 @@ class SraDownloader:
             experiment_id: The SRA experiment identifier to download.
         """
         cache_file = os.path.join(self.root_dir, self.output_dir, self.bac_name, experiment_id, f"{experiment_id}.fasta")
-        if os.path.exists(cache_file):
-            self.logger.debug(f"Using cached file for: {experiment_id}")
+        if self.use_existing_files and os.path.exists(cache_file):
+            self.logger.debug(f"Using existing file for: {experiment_id}")
             return
 
         # Try to acquire lock for this experiment
@@ -117,12 +119,12 @@ class SraDownloader:
             self.logger.info(
                 f"Another process is already downloading {experiment_id}. Waiting..."
             )
-            # Wait for the file to appear in cache
+            # Wait for the file to appear in output
             max_wait_time = 600  # 10 minutes timeout
             wait_time = 0
             while wait_time < max_wait_time:
                 if os.path.exists(cache_file):
-                    self.logger.info(f"File {experiment_id} is now available in cache.")
+                    self.logger.info(f"File {experiment_id} is now available in output.")
                     return
                 time.sleep(10)
                 wait_time += 10
@@ -160,13 +162,14 @@ class SraDownloader:
             self.logger.info(f"Downloading on: {output_path}")
             os.makedirs(output_path, exist_ok=True)
             os.makedirs(self.temp, exist_ok=True)
-            # os.system(f"prefetch {experiment_id} -O {temp_dir}/pre_fetch/")
+            # os.system(f"prefetch {experiment_id} -O {temp_dir}/")
             # Use smaller hash table size and limit threads to reduce memory usage
             command = f"fasterq-dump {experiment_id} -O {output_path} --fasta -p -t {self.temp}/"
             os.system(command)
 
             # Cache the downloaded file
-            os.system(f"cp {os.path.join(output_path, experiment_id)}.fasta {cache_file}")
+            if not self.use_existing_files:
+                os.system(f"cp {os.path.join(output_path, experiment_id)}.fasta {cache_file}")
         except Exception as error:
             self.logger.error(f"Error downloading file for: {experiment_id}\n{error}")
         finally:

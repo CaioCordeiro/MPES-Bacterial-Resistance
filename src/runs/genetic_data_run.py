@@ -50,7 +50,6 @@ class GeneticDataRun:
                 "bacteria": bac,
                 "model_class": model.__class__.__name__,  # Store class name
                 "feature_selection": fs.name if fs else None,
-                "selected_features": selected_features if selected_features else None,
                 "n_features_requested": getattr(
                     fs, "n_features_to_select", n_features_to_select
                 ),  # Store requested features
@@ -169,9 +168,7 @@ class GeneticDataRun:
                 columns=selected_X_df.columns,
                 index=selected_X_df.index,
             )
-            self.logger.info(f"Scaled DataFrame: {selected_X_df.head()}")
-            self.logger.info(f"Cross-validating Model (type: {self.model.model_type})")
-            scores = self.model.cross_validate(selected_X_df, target_y, cv=10)
+            # self.logger.info(f"Scaled DataFrame: {selected_X_df.head()}")
             self.logger.info("Done cross validating model")
             # Scale df
             # --- Train/Test split for test metrics ---
@@ -180,8 +177,11 @@ class GeneticDataRun:
             )
             self.model.fit(X_train, y_train)
             y_pred = self.model.predict(X_test)
-            test_accuracy = accuracy_score(y_test, y_pred)
-            test_f1 = f1_score(y_test, y_pred, average="weighted", zero_division=0)
+            self.logger.info(f"Cross-validating Model (type: {self.model.model_type})")
+            scores = self.model.cross_validate(selected_X_df, target_y)
+            self.logger.info(
+                f"Cross-validation scores: {scores}"
+            )  # Log the cross-validation scores
 
             model_summary = self.model.get_summary()
             best_params = self.model.get_best_params()
@@ -194,8 +194,6 @@ class GeneticDataRun:
             )
             result_data["model_summary"] = model_summary
             result_data["best_params"] = best_params
-            result_data["test_accuracy"] = test_accuracy
-            result_data["test_f1_score"] = test_f1
             result_data["status"] = "Success"
             self.logger.info(
                 f"Run Success. Mean CV Score: {result_data['mean_cv_score']}"

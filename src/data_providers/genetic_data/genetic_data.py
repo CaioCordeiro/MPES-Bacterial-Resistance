@@ -64,7 +64,18 @@ class GeneticDataset(DatasetInterface):
         self.kmer_size = kmer_size
         self.feature_output_dir = os.path.join(self.root_dir, feature_output, self.bac_name)
         self.dataset_output_dir = os.path.join(self.root_dir, dataset_output, self.bac_name)
-        self._treated_data: DataFrame = None
+        # Read from output_dir if it exists
+        if os.path.exists(self.dataset_output_dir):
+            self.logger.info(f"Loading existing dataset from {self.dataset_output_dir}")
+            # Read the bac.csv file (it only has one file)
+            filepath = os.path.join(self.dataset_output_dir, f"{self.bac_name}_dataset.csv")
+            if os.path.exists(filepath):
+                self.logger.info(f"Loading existing dataset from {filepath}")
+                self._treated_data = pd.read_csv(filepath)
+            else:
+                self.logger.warning(f"File {filepath} does not exist. Creating new dataset.")
+                self._treated_data = None
+        self.use_existing_files = True  # New option to use existing files
         create_folder(self.raw_data_output_dir)
         create_folder(self.feature_output_dir)
         create_folder(self.dataset_output_dir)
@@ -105,6 +116,16 @@ class GeneticDataset(DatasetInterface):
             )
             return
 
+        # Chack if we already have enough raw data directories with files
+        raw_data_dirs = [
+            d for d in os.listdir(self.raw_data_output_dir) if os.path.isdir(os.path.join(self.raw_data_output_dir, d))
+        ]
+        if len(raw_data_dirs) >= (self.max_sra_ids or float("inf")):
+            self.logger.debug(
+                f"Sufficient raw data directories ({len(raw_data_dirs)}) already exist. Skipping download."
+            )
+            return
+
         self.logger.info("Fetching raw genetic data from SRA...")
         downloader = SraDownloader(
             sra_id_list=self.sra_ids,
@@ -112,6 +133,7 @@ class GeneticDataset(DatasetInterface):
             bac_name=self.bac_name,
             max_sra_ids=self.max_sra_ids,
             root_dir=self.root_dir,
+            use_existing_files=self.use_existing_files,  # Pass the new option
         )
         downloader.download()
         self.logger.info("Raw genetic data fetching finished.")

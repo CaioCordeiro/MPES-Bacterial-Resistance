@@ -85,17 +85,17 @@ class PearsonCorrelationSelector(FeatureSelectionInterface):
         # Handle potential NaNs resulting from constant columns or other issues
         self.feature_scores_ = X.corrwith(y).abs().fillna(0.0)
         self._scores_calculated = True
-        # Sort features by scores in descending order
-        ranked_features = self.feature_scores_.sort_values(ascending=False)
-        self.logger.warning(
-            f"Done running correlation for {len(self.feature_names_in_)}"
-        )
-        # return the full list of ranked features with only the feature names
-        self.ranked_features_ = ranked_features.index.tolist()
+        # Given self.feature_scores_ is a Series, we neet to match the feature names with its importance~
+        self.feature_scores_.index = self.feature_names_in_
+        self.feature_scores_ = self.feature_scores_.sort_values(ascending=False)
+        # Now we should return a list of feature names sorted by their absolute correlation
+        # with the target variable in descending order
+        self.feature_scores_ = self.feature_scores_.sort_values(ascending=False)
+        self.feature_names_in_ = self.feature_scores_.index.to_numpy()
         self.logger.info(
-            f"Feature ranking completed. Top features: {self.ranked_features_[:10]}"
-        )
-        return self.ranked_features_
+            f"Feature scores calculated. Top features: {self.feature_scores_.head()} - Importance: {self.feature_scores_.head().values}"
+        ) 
+        return self.feature_names_in_.tolist()
 
 
     def _select_features(self, data: DataFrame) -> DataFrame:

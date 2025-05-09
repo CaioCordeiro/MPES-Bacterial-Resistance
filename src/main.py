@@ -63,7 +63,7 @@ def prepare_all_datasets(bacteria_list, max_sra_ids):
 def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = None):
     """
     Plots metrics for each combination of model and feature selector for a given bacteria.
-    Saves a separate plot for each (model, feature selector, bacteria) combination.
+    Saves a separate plot for each metric and each (model, feature selector, bacteria) combination.
     """
     import os
 
@@ -78,48 +78,61 @@ def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = 
                 grouped[key] = []
             grouped[key].append(result)
 
+
+    y_min = 0
+    y_max = 1
+
     for (model_name, fs_name), group_results in grouped.items():
-        metrics = {
+        metrics_data = {
             "f1_score": [],
             "accuracy": [],
             "n_features": [],
-            "scores": [],
+            "scores": [], # Cross-Validation Scores
         }
         for result in group_results:
-            metrics["n_features"].append(result.get("n_features_requested"))
-            metrics["f1_score"].append(result.get("test_f1_score", 0))
-            metrics["accuracy"].append(result.get("test_accuracy", 0))
-            metrics["scores"].append(
+            metrics_data["n_features"].append(result.get("n_features_requested"))
+            metrics_data["f1_score"].append(result.get("test_f1_score", 0))
+            metrics_data["accuracy"].append(result.get("test_accuracy", 0))
+            metrics_data["scores"].append(
                 np.mean(result.get("scores", [])) if result.get("scores") else 0
             )
 
-        feature_sizes = sorted(set(metrics["n_features"]))
-        plt.figure(figsize=(10, 6))
-        # Plot F1 Score
-        plt.plot(
-            feature_sizes,
-            [metrics["f1_score"][metrics["n_features"].index(n)] for n in feature_sizes],
-            marker='o',
-            label='F1 Score'
-        )
-        # Plot Accuracy
-        plt.plot(
-            feature_sizes,
-            [metrics["accuracy"][metrics["n_features"].index(n)] for n in feature_sizes],
-            marker='o',
-            label='Accuracy'
-        )
+        feature_sizes = sorted(set(metrics_data["n_features"]))
 
-        plt.title(f'{bacteria} - {model_name} - {fs_name}')
-        plt.xlabel('Number of Features')
-        plt.ylabel('Metric Value')
-        plt.legend()
-        plt.grid()
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        filename = f"{timestamp}_{bacteria}_{model_name}_{fs_name}_metrics.jpg"
-        plt.savefig(filename)
-        plt.close()
-        print(f"Metrics plot saved for {bacteria}, {model_name}, {fs_name} as {filename}")
+        metrics_to_plot = {
+            "F1 Score": "f1_score",
+            "Accuracy": "accuracy",
+            "Cross-Validation Score": "scores"
+        }
+
+        for metric_display_name, metric_key in metrics_to_plot.items():
+            plt.figure(figsize=(10, 6))
+            
+            # Prepare y-values for the current metric
+            y_values = [metrics_data[metric_key][metrics_data["n_features"].index(n)] for n in feature_sizes]
+
+            plt.plot(
+                feature_sizes,
+                y_values,
+                marker='o',
+                label=metric_display_name
+            )
+
+            plt.title(f'{bacteria} - {model_name} - {fs_name} - {metric_display_name}')
+            plt.xlabel('Number of Features')
+            plt.ylabel(metric_display_name)
+            plt.ylim(y_min, y_max)
+            plt.legend()
+            plt.grid()
+            
+            plot_timestamp = time.strftime("%Y%m%d-%H%M%S")
+            os.makedirs("plots", exist_ok=True)
+            # Sanitize metric_display_name for filename
+            safe_metric_name = metric_display_name.replace(" ", "_")
+            filename = f"plots/{plot_timestamp}_{bacteria}_{model_name}_{fs_name}_{safe_metric_name}.jpg"
+            plt.savefig(filename)
+            plt.close()
+            print(f"Metrics plot saved for {bacteria}, {model_name}, {fs_name} ({metric_display_name}) as {filename}")
 
 def main():
     # --- Argument Parser Setup --- <<< ADD THIS SECTION

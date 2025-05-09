@@ -31,7 +31,7 @@ SRA_ID_LIST_ECH = [
     "ERR2091401",
 ]
 EXCLUDE_LIST = []
-K_SIZE = 5
+K_SIZE = 6
 FILE_DIR = "data/raw_data"
 OUTPUT_DIR = "data/features"
 ANTIBIOTIC_LIST = [

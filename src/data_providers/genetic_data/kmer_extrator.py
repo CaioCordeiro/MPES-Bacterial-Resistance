@@ -22,7 +22,7 @@ class KmerExtractor:
 
     def __init__(
         self,
-        k_size: int = 5,
+        k_size: int = 10,
         file_dir: str = "data/raw_data",
         output_dir: str = "data/features",
         kmer_counter_dir: str = "data/kmer_counter",
@@ -191,32 +191,32 @@ class KmerExtractor:
                 wait_time = 0
                 # cache_key = self._get_cache_key(sra_id)
                 # cache_file = os.path.join(self.root_dir, self.cache_dir, f"{cache_key}.csv")
-                while wait_time < max_wait_time:
-                    if os.path.exists(output_file):
-                        self.logger.info(
-                            f"Sequence {sra_id} is now processed by another thread."
-                        )
-                        cached_data = self._check_cache(sra_id)
-                        if cached_data:
-                        #     self._save_kmer_data(sra_id=sra_id, data=cached_data)
-                            return
-                    time.sleep(5)
-                    wait_time += 5
-                self.logger.warning(
-                    f"Timeout waiting for {sra_id} to be processed by another thread."
-                )
-                continue
+                # while wait_time < max_wait_time:
+                #     if os.path.exists(output_file):
+                #         self.logger.info(
+                #             f"Sequence {sra_id} is now processed by another thread."
+                #         )
+                #         cached_data = self._check_cache(sra_id)
+                #         if cached_data:
+                #         #     self._save_kmer_data(sra_id=sra_id, data=cached_data)
+                #             return
+                #     time.sleep(5)
+                #     wait_time += 5
+                # self.logger.warning(
+                #     f"Timeout waiting for {sra_id} to be processed by another thread."
+                # )
+                # continue
 
             try:
                 start_time = time.time()
 
                 # Check if we have enough memory before processing
-                available_memory_percent = psutil.virtual_memory().percent
-                if available_memory_percent < 20:  # Less than 20% memory available
-                    self.logger.warning(
-                        f"Low memory ({available_memory_percent:.1f}% available). Waiting before processing {sra_id}..."
-                    )
-                    time.sleep(60)  # Wait for a minute to let other processes finish
+                # available_memory_percent = psutil.virtual_memory().percent
+                # if available_memory_percent < 20:  # Less than 20% memory available
+                #     self.logger.warning(
+                #         f"Low memory ({available_memory_percent:.1f}% available). Waiting before processing {sra_id}..."
+                #     )
+                #     time.sleep(60)  # Wait for a minute to let other processes finish
 
                 self._run_jellyfish_commands(sra_id)
                 kmer_data = self._parse_jellyfish_output(sra_id)
@@ -232,15 +232,21 @@ class KmerExtractor:
         """
         Iterates through the files in the specified input directory, extracts k-mers
         using Jellyfish, and saves the counts to CSV files.
+        Starts 2 sequences at a time using threads.
         """
-        file_list = os.listdir(self.file_dir)
+        import threading
+        import gc
 
-        # Process files in batches to control memory usage
-        batch_size = 5  # Process 5 files at a time
+        file_list = os.listdir(self.file_dir)
+        batch_size = 2  # Start 2 sequences at a time
+
         for i in range(0, len(file_list), batch_size):
             batch = file_list[i : i + batch_size]
-            self._process_batch(batch)
-            # Force garbage collection after each batch
-            import gc
-
+            threads = []
+            for file_name in batch:
+                t = threading.Thread(target=self._process_batch, args=([file_name],))
+                t.start()
+                threads.append(t)
+            for t in threads:
+                t.join()
             gc.collect()
