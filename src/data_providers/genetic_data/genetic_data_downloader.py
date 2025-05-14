@@ -107,7 +107,13 @@ class SraDownloader:
         Args:
             experiment_id: The SRA experiment identifier to download.
         """
-        cache_file = os.path.join(self.root_dir, self.output_dir, self.bac_name, experiment_id, f"{experiment_id}.fasta")
+        cache_file = os.path.join(
+            self.root_dir,
+            self.output_dir,
+            self.bac_name,
+            experiment_id,
+            f"{experiment_id}.fasta",
+        )
         if self.use_existing_files and os.path.exists(cache_file):
             self.logger.debug(f"Using existing file for: {experiment_id}")
             return
@@ -124,7 +130,9 @@ class SraDownloader:
             wait_time = 0
             while wait_time < max_wait_time:
                 if os.path.exists(cache_file):
-                    self.logger.info(f"File {experiment_id} is now available in output.")
+                    self.logger.info(
+                        f"File {experiment_id} is now available in output."
+                    )
                     return
                 time.sleep(10)
                 wait_time += 10
@@ -158,7 +166,9 @@ class SraDownloader:
                     f"Low disk space ({disk_usage.percent}%). This may cause download failures."
                 )
 
-            output_path = os.path.join(self.root_dir, self.output_dir, self.bac_name, experiment_id)
+            output_path = os.path.join(
+                self.root_dir, self.output_dir, self.bac_name, experiment_id
+            )
             self.logger.info(f"Downloading on: {output_path}")
             os.makedirs(output_path, exist_ok=True)
             os.makedirs(self.temp, exist_ok=True)
@@ -169,7 +179,9 @@ class SraDownloader:
 
             # Cache the downloaded file
             if not self.use_existing_files:
-                os.system(f"cp {os.path.join(output_path, experiment_id)}.fasta {cache_file}")
+                os.system(
+                    f"cp {os.path.join(output_path, experiment_id)}.fasta {cache_file}"
+                )
         except Exception as error:
             self.logger.error(f"Error downloading file for: {experiment_id}\n{error}")
         finally:

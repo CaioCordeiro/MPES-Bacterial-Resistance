@@ -10,13 +10,23 @@ from typing import IO, Dict, Generator, List, Optional
 
 import pandas as pd
 
-from constants.constants import (ANTIBIOTIC_FILE, ANTIBIOTIC_LIST, ROOT_DIR,
-                                 DATASET_OUTPUT_DIR, FEATURE_DIR, K_SIZE,
-                                 MAX_MEMORY_PERCENT)
+from constants.constants import (
+    ANTIBIOTIC_FILE,
+    ANTIBIOTIC_LIST,
+    ROOT_DIR,
+    DATASET_OUTPUT_DIR,
+    FEATURE_DIR,
+    K_SIZE,
+    MAX_MEMORY_PERCENT,
+)
 from utils.logging_config import get_logger
 
-from .utils import (check_dataset_file,  # Assuming these are in 'utils.py'
-                    create_folder, normalize_mic, write_csv_file)
+from .utils import (
+    check_dataset_file,  # Assuming these are in 'utils.py'
+    create_folder,
+    normalize_mic,
+    write_csv_file,
+)
 
 
 class DatasetGenerator:
@@ -25,7 +35,9 @@ class DatasetGenerator:
     with antibiotic Minimum Inhibitory Concentration (MIC) data.
     """
 
-    def __init__(self, root_dir: str = ROOT_DIR,
+    def __init__(
+        self,
+        root_dir: str = ROOT_DIR,
         feature_dir: str = FEATURE_DIR,
         output_dir: str = DATASET_OUTPUT_DIR,
         antibiotic_file: str = ANTIBIOTIC_FILE,
@@ -54,7 +66,9 @@ class DatasetGenerator:
         self.output_dir = os.path.join(self.root_dir, output_dir)
         self.cache_dir = os.path.join(self.root_dir, cache_dir)
         self.lock_dir = os.path.join(self.cache_dir, "locks")
-        self.antibiotic_file = os.path.join(self.root_dir, f"{antibiotic_file}/{self.bac_name}/antibotic_relation.csv")
+        self.antibiotic_file = os.path.join(
+            self.root_dir, f"{antibiotic_file}/{self.bac_name}/antibotic_relation.csv"
+        )
         self.dataset_lock_file = os.path.join(
             self.lock_dir, f"{self.bac_name}_dataset.lock"
         )
@@ -227,7 +241,9 @@ class DatasetGenerator:
         seq_data: List[List] = []
 
         # Output file path
-        output_filepath = os.path.join(self.root_dir, self.output_dir, f"{self.bac_name}_dataset.csv")
+        output_filepath = os.path.join(
+            self.root_dir, self.output_dir, f"{self.bac_name}_dataset.csv"
+        )
 
         # Try to acquire lock for dataset generation
         lock_fd = self._acquire_lock()
@@ -261,7 +277,9 @@ class DatasetGenerator:
                 self.logger.warning(f"No feature files found in {self.feature_dir}")
 
             # Check for cached dataset
-            cache_file = os.path.join(self.root_dir, self.cache_dir, f"{self.bac_name}_dataset.csv")
+            cache_file = os.path.join(
+                self.root_dir, self.cache_dir, f"{self.bac_name}_dataset.csv"
+            )
             if os.path.exists(cache_file):
                 self.logger.info(f"Using cached dataset for: {self.bac_name}")
                 df = pd.read_csv(cache_file)
@@ -309,7 +327,9 @@ class DatasetGenerator:
         Args:
             df: A DataFrame representing the generated dataset.
         """
-        output_filepath = os.path.join(self.root_dir, self.output_dir, f"{self.bac_name}_dataset.csv")
+        output_filepath = os.path.join(
+            self.root_dir, self.output_dir, f"{self.bac_name}_dataset.csv"
+        )
         df.to_csv(output_filepath, index=False)
 
         # Validate the saved dataset

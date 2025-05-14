@@ -1,4 +1,4 @@
-from sklearn.svm import SVC, SVR 
+from sklearn.svm import SVC, SVR
 from sklearn.model_selection import train_test_split
 
 from constants.constants import ROOT_DIR
@@ -33,12 +33,12 @@ anti = [
 ]
 
 bac = "kleb"
-data = GeneticDataset(bac_name=bac, max_sra_ids=150, root_dir='/mnt/d')
+data = GeneticDataset(bac_name=bac, max_sra_ids=150, root_dir="/mnt/d")
 model = SupportVectorMachineModel()
 df = data.treated_data.copy()
 df = df.drop(anti, axis=1, errors="ignore")
 X = df.drop(columns=["ciprofloxacin"]).dropna()
-y = df['ciprofloxacin'].dropna()
+y = df["ciprofloxacin"].dropna()
 scores = model.cross_validate(X, y, cv=10)
 print(f"Cross-validation scores: {scores}")
 model.fit(X, y)
@@ -76,9 +76,20 @@ max_features_to_select = 1023
 n_features_to_select = 10
 from multiprocessing import Pool
 from functools import partial
+
+
 def run_genetic_data_run(n_features_to_select):
-    run = GeneticDataRun(data, "ciprofloxacin", bac, model, fs=None, selected_features=ranked_features[:n_features_to_select])
+    run = GeneticDataRun(
+        data,
+        "ciprofloxacin",
+        bac,
+        model,
+        fs=None,
+        selected_features=ranked_features[:n_features_to_select],
+    )
     return run.run()
+
+
 with Pool() as pool:
     results = pool.map(run_genetic_data_run, range(10, max_features_to_select, 10))
 # Print the results
@@ -86,5 +97,6 @@ for n_features, result in enumerate(results, start=1):
     print(f"Results for {n_features} features: {result}")
 # save all results on a file
 import pandas as pd
+
 results_df = pd.DataFrame(results)
 results_df.to_csv("results.csv", index=False)

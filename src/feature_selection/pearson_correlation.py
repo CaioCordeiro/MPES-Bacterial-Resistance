@@ -94,9 +94,8 @@ class PearsonCorrelationSelector(FeatureSelectionInterface):
         self.feature_names_in_ = self.feature_scores_.index.to_numpy()
         self.logger.info(
             f"Feature scores calculated. Top features: {self.feature_scores_.head()} - Importance: {self.feature_scores_.head().values}"
-        ) 
+        )
         return self.feature_names_in_.tolist()
-
 
     def _select_features(self, data: DataFrame) -> DataFrame:
         """

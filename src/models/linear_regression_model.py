@@ -75,23 +75,27 @@ class LinearRegressionModel:
         # Standardize features
         # self.scaler = StandardScaler() # Moved scaler initialization to __init__
         X_scaled = self.scaler.fit_transform(X.values)
-        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_scaled, y, test_size=0.2, random_state=42
+        )
         grid_search = GridSearchCV(
-                estimator=self._get_model_instance(),
-                param_grid=self._param_grid,
-                scoring="",
-                cv=self.cv,
-                return_train_score=True,
-                n_jobs=2,  # Limit to 2 cores to reduce memory usage
-                verbose=0,  # Reduce verbosity to minimize output
-            )
+            estimator=self._get_model_instance(),
+            param_grid=self._param_grid,
+            scoring="",
+            cv=self.cv,
+            return_train_score=True,
+            n_jobs=2,  # Limit to 2 cores to reduce memory usage
+            verbose=0,  # Reduce verbosity to minimize output
+        )
 
         # split the data into training and validation sets
         grid_search.fit(X_train, y_train)
         self.best_model = grid_search.best_estimator_
         self.best_params_ = grid_search.best_params_  # Store the best parameters
         self.model = self.best_model
-        self._update_summary(X_test, y_test)  # Pass original X for scaling within summary update
+        self._update_summary(
+            X_test, y_test
+        )  # Pass original X for scaling within summary update
         return self
 
     def _get_model_instance(self) -> Union[Ridge, Lasso, ElasticNet]:
@@ -183,9 +187,7 @@ class LinearRegressionModel:
         metrics["accuracy"] = accuracy_score(y, y_pred)
         # Use average='weighted' for multiclass or if classes are imbalanced
         # Use average='binary' if strictly binary and want score for positive class
-        metrics["f1_score"] = f1_score(
-            y, y_pred, average="weighted", zero_division=0
-        )
+        metrics["f1_score"] = f1_score(y, y_pred, average="weighted", zero_division=0)
         # Cast all arrays inside confusion matrix to list
         # This is necessary for JSON serialization
         confusion_matrix_result = confusion_matrix(y, y_pred)

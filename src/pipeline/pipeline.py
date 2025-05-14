@@ -18,6 +18,7 @@ from runs.run_results import save_final_results
 from utils.logging_config import get_logger
 import constants.constants as const
 
+
 class Pipeline:
     """
     Pipeline to run experiments...
@@ -29,7 +30,9 @@ class Pipeline:
         prepared_datasets: Dict[str, GeneticDataset] = None,
         bacteria_list: List[str] = None,
         models: List[
-            Union[Type[SVC], Type[SklearnLinearRegression], Type[LogisticRegressionModel]]
+            Union[
+                Type[SVC], Type[SklearnLinearRegression], Type[LogisticRegressionModel]
+            ]
         ] = None,
         feature_selectors: List[Type] = None,
         feature_range: range = range(5, 36, 5),
@@ -81,11 +84,9 @@ class Pipeline:
         df = data.treated_data.copy()
         anti_list_without_target = const.ANTIBIOTIC_LIST.copy()
         if self.target_antibiotic in anti_list_without_target:
-            anti_list_without_target.remove(
-                self.target_antibiotic
-            )
+            anti_list_without_target.remove(self.target_antibiotic)
         df = df.drop(anti_list_without_target, axis=1, errors="ignore")
-                
+
         for ModelClass in self.models:
             # Train the model once if SHAP is used
             trained_model = None
@@ -101,9 +102,7 @@ class Pipeline:
                     else:
                         # Run other feature selection algorithms
                         fs_instance = FSClass()
-                        ranked_features = fs_instance.fit(
-                            df, self.target_antibiotic
-                        )
+                        ranked_features = fs_instance.fit(df, self.target_antibiotic)
 
                     self.logger.info(
                         f"Feature ranking completed for {bac} using {FSClass.__name__}. "

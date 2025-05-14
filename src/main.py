@@ -5,22 +5,25 @@ from typing import Any, Dict, List
 import matplotlib.pyplot as plt  # Make sure this is imported
 import numpy as np  # Make sure this is imported
 
-from data_providers.genetic_data.genetic_data import \
-    GeneticDataset  # Make sure this is imported
-from models.logistic_regression_model import \
-    LogisticRegressionModel  # Make sure this is imported
+from data_providers.genetic_data.genetic_data import (
+    GeneticDataset,
+)  # Make sure this is imported
+from models.logistic_regression_model import (
+    LogisticRegressionModel,
+)  # Make sure this is imported
 from models.svm import SupportVectorMachineModel
 
-from feature_selection.pearson_correlation import \
-    PearsonCorrelationSelector  # Make sure this is imported
+from feature_selection.pearson_correlation import (
+    PearsonCorrelationSelector,
+)  # Make sure this is imported
 from feature_selection.banzaff_power_index import BanzhafFeatureSelector
 from feature_selection.shap_feature_selector import ShapFeatureSelector
 from feature_selection.rrelief import RReliefF
 from pipeline.pipeline import Pipeline
-from runs.run_results import \
-    save_final_results  # Import if saving here instead of Pipeline
-from utils.logging_config import (get_logger,  # Make sure this is imported
-                                  setup_logging)
+from runs.run_results import (
+    save_final_results,
+)  # Import if saving here instead of Pipeline
+from utils.logging_config import get_logger, setup_logging  # Make sure this is imported
 
 
 # --- Functions: check_and_prepare_data, prepare_all_datasets ---
@@ -31,7 +34,9 @@ def check_and_prepare_data(bac_name, max_sra_ids):
     logger.info(f"Checking/Preparing data for {bac_name} (max_ids={max_sra_ids})...")
     # Placeholder: Add actual data preparation logic using GeneticDataset
     try:
-        dataset = GeneticDataset(bac_name=bac_name, max_sra_ids=max_sra_ids, root_dir='/mnt/d')
+        dataset = GeneticDataset(
+            bac_name=bac_name, max_sra_ids=max_sra_ids, root_dir="/mnt/d"
+        )
         # Trigger data loading/generation if not cached
         _ = dataset.treated_data
         logger.info(f"Data preparation successful for {bac_name}.")
@@ -78,7 +83,6 @@ def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = 
                 grouped[key] = []
             grouped[key].append(result)
 
-
     y_min = 0
     y_max = 1
 
@@ -87,12 +91,16 @@ def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = 
             "f1_score": [],
             "accuracy": [],
             "n_features": [],
-            "scores": [], # Cross-Validation Scores
+            "scores": [],  # Cross-Validation Scores
         }
         for result in group_results:
             metrics_data["n_features"].append(result.get("n_features_requested"))
-            metrics_data["f1_score"].append(result.get("model_summary").get("f1_score", 0))
-            metrics_data["accuracy"].append(result.get("model_summary").get("test_accuracy", 0))
+            metrics_data["f1_score"].append(
+                result.get("model_summary").get("f1_score", 0)
+            )
+            metrics_data["accuracy"].append(
+                result.get("model_summary").get("test_accuracy", 0)
+            )
             metrics_data["scores"].append(
                 np.mean(result.get("scores", [])) if result.get("scores") else 0
             )
@@ -102,29 +110,27 @@ def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = 
         metrics_to_plot = {
             "F1 Score": "f1_score",
             "Accuracy": "accuracy",
-            "Cross-Validation Score": "scores"
+            "Cross-Validation Score": "scores",
         }
 
         for metric_display_name, metric_key in metrics_to_plot.items():
             plt.figure(figsize=(10, 6))
-            
+
             # Prepare y-values for the current metric
-            y_values = [metrics_data[metric_key][metrics_data["n_features"].index(n)] for n in feature_sizes]
+            y_values = [
+                metrics_data[metric_key][metrics_data["n_features"].index(n)]
+                for n in feature_sizes
+            ]
 
-            plt.plot(
-                feature_sizes,
-                y_values,
-                marker='o',
-                label=metric_display_name
-            )
+            plt.plot(feature_sizes, y_values, marker="o", label=metric_display_name)
 
-            plt.title(f'{bacteria} - {model_name} - {fs_name} - {metric_display_name}')
-            plt.xlabel('Number of Features')
+            plt.title(f"{bacteria} - {model_name} - {fs_name} - {metric_display_name}")
+            plt.xlabel("Number of Features")
             plt.ylabel(metric_display_name)
             plt.ylim(y_min, y_max)
             plt.legend()
             plt.grid()
-            
+
             plot_timestamp = time.strftime("%Y%m%d-%H%M%S")
             os.makedirs("plots", exist_ok=True)
             # Sanitize metric_display_name for filename
@@ -132,7 +138,10 @@ def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = 
             filename = f"plots/{plot_timestamp}_{bacteria}_{model_name}_{fs_name}_{safe_metric_name}.jpg"
             plt.savefig(filename)
             plt.close()
-            print(f"Metrics plot saved for {bacteria}, {model_name}, {fs_name} ({metric_display_name}) as {filename}")
+            print(
+                f"Metrics plot saved for {bacteria}, {model_name}, {fs_name} ({metric_display_name}) as {filename}"
+            )
+
 
 def main():
     # --- Argument Parser Setup --- <<< ADD THIS SECTION
@@ -166,15 +175,17 @@ def main():
 
     args = parser.parse_args()  # This line should now work
     print(args)
-    logger = setup_logging(args.log_level, f"{time.strftime('%Y%m%d-%H:%M:%S')}_{args.log_file}")
+    logger = setup_logging(
+        args.log_level, f"{time.strftime('%Y%m%d-%H:%M:%S')}_{args.log_file}"
+    )
     logger.info(f"Starting pipeline with log level: {args.log_level}")
 
     bacteria_list = args.bacteria
     # Define models and feature selectors (ensure they are lists of classes)
     models_to_run = [
-                    SupportVectorMachineModel, 
-                     LogisticRegressionModel
-                     ]  # Add others like SVC if needed
+        SupportVectorMachineModel,
+        LogisticRegressionModel,
+    ]  # Add others like SVC if needed
     feature_selectors_to_run = [
         PearsonCorrelationSelector,
         # BanzhafFeatureSelector,
@@ -195,7 +206,7 @@ def main():
         logger.error("No valid bacteria datasets available. Exiting.")
         return
     # Paralelize the pipeline run
-    
+
     pipeline = Pipeline(
         prepared_datasets=prepared_datasets,
         bacteria_list=[

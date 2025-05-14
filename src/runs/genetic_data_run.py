@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 import constants.constants as const
 from data_providers.genetic_data.genetic_data import GeneticDataset
 from entities.interfaces.feature_selection import FeatureSelectionInterface
+
 # from .run_results import RunResults # No longer needed here
 from utils.logging_config import get_logger
 
@@ -39,9 +40,13 @@ class GeneticDataRun:
         self.bac: str = bac
         self.model: BaseEstimator = model
         self.fs: FeatureSelectionInterface = fs
-        self._selected_features: List[str] = selected_features if selected_features else []
+        self._selected_features: List[str] = (
+            selected_features if selected_features else []
+        )
         # self.results_store: RunResults = RunResults() # Removed
-        self.n_features_to_select: int = n_features_to_select if n_features_to_select else 0
+        self.n_features_to_select: int = (
+            n_features_to_select if n_features_to_select else 0
+        )
         self.run_config: Dict[str, Any] = run_config if run_config is not None else {}
         # Base config - more details added in run()
         self.run_config.update(
@@ -124,9 +129,9 @@ class GeneticDataRun:
                 f"Starting Feature Selection: {self.fs.name} for {self.n_features_to_select} features on bacteria {self.bac}"
             )
             # Ensure fit returns the DataFrame with selected features
-            self._selected_features = self.fs.fit(
-                self._df.copy(), self.target
-            )[:self.n_features_to_select]  # Pass a copy to avoid modifying original _df if fs modifies inplace
+            self._selected_features = self.fs.fit(self._df.copy(), self.target)[
+                : self.n_features_to_select
+            ]  # Pass a copy to avoid modifying original _df if fs modifies inplace
         return self._X[self._selected_features]
 
     def run(self) -> Dict[str, Any]:  # Changed return type
@@ -140,14 +145,10 @@ class GeneticDataRun:
             self.selected_features
         )  # Get the DataFrame with selected features
         # show the selected df
-        self.logger.info(
-            f"Selected features DataFrame: {selected_X_df.head()}"
-        )
+        self.logger.info(f"Selected features DataFrame: {selected_X_df.head()}")
         target_y = self._y  # Get the target series
         # Save to csv for debugging the full master table, with target (sekected_X_df  + target_y)
-        mt_with_target = pd.concat(
-            [selected_X_df, target_y], axis=1
-        )
+        mt_with_target = pd.concat([selected_X_df, target_y], axis=1)
         mt_with_target.to_csv(
             f"mt_with_target_{self.bac}_{self.target}.csv",
             index=False,
@@ -162,7 +163,7 @@ class GeneticDataRun:
 
         try:
             self.logger.info(f"Fitting Model (type: {self.model.model_type})")
-           # --- Cross-validation ---
+            # --- Cross-validation ---
             scaler = StandardScaler()
             selected_X_df = pd.DataFrame(
                 scaler.fit_transform(selected_X_df),
@@ -174,7 +175,11 @@ class GeneticDataRun:
             # Scale df
             # --- Train/Test split for test metrics ---
             X_train, X_test, y_train, y_test = train_test_split(
-                selected_X_df, target_y, test_size=0.2, random_state=42, stratify=target_y if len(set(target_y)) > 1 else None
+                selected_X_df,
+                target_y,
+                test_size=0.2,
+                random_state=42,
+                stratify=target_y if len(set(target_y)) > 1 else None,
             )
             self.model.fit(X_train, y_train)
             y_pred = self.model.predict(X_test)
@@ -194,47 +199,70 @@ class GeneticDataRun:
                 np.mean(scores) if scores is not None and len(scores) > 0 else None
             )
             # Calculate p-value for cross-validation scores
-            if scores is not None and ((isinstance(scores, list) and len(scores) > 1) or \
-                                       (isinstance(scores, np.ndarray) and scores.size > 1)):
-                is_classification_model = getattr(self.model, 'model_type', None) in ['svc', 'logistic_regression']
-                is_relevant_scoring = getattr(self.model, 'scoring', '') in ['accuracy', 'f1_weighted', 'f1_macro', 'f1_micro', 'roc_auc']
+            if scores is not None and (
+                (isinstance(scores, list) and len(scores) > 1)
+                or (isinstance(scores, np.ndarray) and scores.size > 1)
+            ):
+                is_classification_model = getattr(self.model, "model_type", None) in [
+                    "svc",
+                    "logistic_regression",
+                ]
+                is_relevant_scoring = getattr(self.model, "scoring", "") in [
+                    "accuracy",
+                    "f1_weighted",
+                    "f1_macro",
+                    "f1_micro",
+                    "roc_auc",
+                ]
 
                 if is_classification_model and is_relevant_scoring:
                     try:
-                        baseline = 0.5 
-                        if len(target_y.unique()) > 2 and self.model.scoring == 'accuracy':
-                             baseline = 1.0 / len(target_y.unique())
+                        baseline = 0.5
+                        if (
+                            len(target_y.unique()) > 2
+                            and self.model.scoring == "accuracy"
+                        ):
+                            baseline = 1.0 / len(target_y.unique())
 
-                        t_statistic, p_value = ttest_1samp(scores, baseline, alternative='greater')
-                        
+                        t_statistic, p_value = ttest_1samp(
+                            scores, baseline, alternative="greater"
+                        )
+
                         # Calculate degrees of freedom
                         df = len(scores) - 1
-                        
+
                         # Calculate confidence interval for the mean of the scores
                         # Using a 95% confidence level by default
                         confidence_level = 0.95
                         mean_score = np.mean(scores)
-                        std_err = np.std(scores, ddof=1) / np.sqrt(len(scores)) # Standard error of the mean
-                        
+                        std_err = np.std(scores, ddof=1) / np.sqrt(
+                            len(scores)
+                        )  # Standard error of the mean
+
                         # Get the critical t-value for the confidence interval
                         # For a one-sided test 'greater', we are interested in the lower bound primarily
                         # but t.interval gives a two-sided interval.
                         # For reporting, a two-sided CI around the mean_score is standard.
-                        ci_low, ci_high = ttest_1samp(scores, mean_score).confidence_interval(confidence_level)
+                        ci_low, ci_high = ttest_1samp(
+                            scores, mean_score
+                        ).confidence_interval(confidence_level)
                         # If using older scipy, or for manual calculation:
                         # from scipy.stats import t
                         # ci_margin = t.ppf((1 + confidence_level) / 2., df) * std_err
                         # ci_low, ci_high = mean_score - ci_margin, mean_score + ci_margin
-
 
                         result_data["cv_score_p_value"] = p_value
                         result_data["cv_score_t_statistic"] = t_statistic
                         result_data["cv_score_degree_freedom"] = df
                         result_data["cv_score_confidence_interval_low"] = ci_low
                         result_data["cv_score_confidence_interval_high"] = ci_high
-                        self.logger.info(f"CV scores t-test (vs {baseline:.2f}, H1: scores > baseline): t={t_statistic:.2f}, p={p_value:.4g}")
+                        self.logger.info(
+                            f"CV scores t-test (vs {baseline:.2f}, H1: scores > baseline): t={t_statistic:.2f}, p={p_value:.4g}"
+                        )
                     except Exception as e_ttest:
-                        self.logger.warning(f"Could not calculate p-value for CV scores: {e_ttest}")
+                        self.logger.warning(
+                            f"Could not calculate p-value for CV scores: {e_ttest}"
+                        )
 
             result_data["model_summary"] = model_summary
             result_data["best_params"] = best_params

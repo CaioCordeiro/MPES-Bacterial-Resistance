@@ -138,7 +138,9 @@ class DatasetCacheManager:
         try:
             # Save the dataset with optimized settings
             df.to_csv(self.dataset_cache_file, index=False, compression="infer")
-            self.logger.info(f"Saved dataset to cache: {self.dataset_cache_file} ({len(df)} rows)")
+            self.logger.info(
+                f"Saved dataset to cache: {self.dataset_cache_file} ({len(df)} rows)"
+            )
 
             # Save metadata
             metadata = {

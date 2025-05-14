@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 
 from src.entities.interfaces.dataset import DatasetInterface
 from src.entities.interfaces.feature_selection import FeatureSelectionInterface
-from src.entities.interfaces.metrics_calculator import \
-    MetricsCalculatorInterface
+from src.entities.interfaces.metrics_calculator import MetricsCalculatorInterface
 from src.entities.interfaces.model import ModelInterface
 
 

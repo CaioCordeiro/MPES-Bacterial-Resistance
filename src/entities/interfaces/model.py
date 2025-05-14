@@ -1,6 +1,7 @@
 from typing import Optional
 import numpy as np
 
+
 class ModelInterface:
     """
     Interface for machine learning models.

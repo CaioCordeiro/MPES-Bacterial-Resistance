@@ -28,7 +28,7 @@ class KmerExtractor:
         kmer_counter_dir: str = "data/kmer_counter",
         exclude_list: List[str] = [],
         cache_dir: str = "data/cache",
-        root_dir: str = '.',
+        root_dir: str = ".",
         bac_name: str = "kleb",
         max_memory_percent: float = 70.0,
     ):
@@ -48,7 +48,9 @@ class KmerExtractor:
         self.k_size = k_size
         self.file_dir = os.path.join(self.root_dir, file_dir, self.bac_name)
         self.output_dir = os.path.join(self.root_dir, output_dir, self.bac_name)
-        self.kmer_counter_dir = os.path.join(self.root_dir, kmer_counter_dir, self.bac_name)
+        self.kmer_counter_dir = os.path.join(
+            self.root_dir, kmer_counter_dir, self.bac_name
+        )
         self.cache_dir = os.path.join(self.root_dir, cache_dir)
         self.lock_dir = os.path.join(self.cache_dir, "locks")
         self.max_memory_percent = max_memory_percent

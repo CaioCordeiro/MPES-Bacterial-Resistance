@@ -13,13 +13,10 @@ import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 from src.constants import constants as const
-from src.data_providers.genetic_data.genetic_data_downloader import \
-    SraDownloader
-from src.data_providers.genetic_data.genetic_dataset_generator import \
-    DatasetGenerator
+from src.data_providers.genetic_data.genetic_data_downloader import SraDownloader
+from src.data_providers.genetic_data.genetic_dataset_generator import DatasetGenerator
 from src.data_providers.genetic_data.kmer_extrator import KmerExtractor
-from src.data_providers.genetic_data.utils import (check_dataset_file,
-                                                   create_folder)
+from src.data_providers.genetic_data.utils import check_dataset_file, create_folder
 
 
 def main():

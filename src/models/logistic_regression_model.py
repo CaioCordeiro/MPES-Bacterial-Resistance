@@ -4,8 +4,20 @@ import numpy as np
 import pandas as pd
 import psutil
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, roc_auc_score, precision_recall_curve, auc
-from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split, StratifiedKFold
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    confusion_matrix,
+    roc_auc_score,
+    precision_recall_curve,
+    auc,
+)
+from sklearn.model_selection import (
+    GridSearchCV,
+    cross_val_score,
+    train_test_split,
+    StratifiedKFold,
+)
 from sklearn.preprocessing import StandardScaler
 
 from utils.logging_config import get_logger
@@ -23,7 +35,7 @@ class LogisticRegressionModel:
     def __init__(
         self,
         param_grid: Optional[Dict[str, List]] = None,
-        cv: int =  StratifiedKFold(n_splits=10, shuffle=True, random_state=42),
+        cv: int = StratifiedKFold(n_splits=10, shuffle=True, random_state=42),
         scoring: str = "f1_weighted",
     ):
         self.param_grid = param_grid or {
@@ -64,18 +76,25 @@ class LogisticRegressionModel:
         try:
             grid_search.fit(X_train, y_train)
         except Exception as e:
-            self.logger.error(f"GridSearchCV failed for LogisticRegression: {e}", exc_info=True)
+            self.logger.error(
+                f"GridSearchCV failed for LogisticRegression: {e}", exc_info=True
+            )
             self._summary = {"status": "Fit Failed", "error": str(e)}
-            self.logger.warning("Attempting to fit with default LogisticRegression parameters as fallback.")
+            self.logger.warning(
+                "Attempting to fit with default LogisticRegression parameters as fallback."
+            )
             try:
                 self.model = self._get_model_instance()
                 self.model.fit(X_train, y_train)
                 self.best_params_ = self.model.get_params()
                 self.best_model = self.model
-                self.logger.info("Fallback LogisticRegression fitting with defaults succeeded.")
+                self.logger.info(
+                    "Fallback LogisticRegression fitting with defaults succeeded."
+                )
             except Exception as fallback_e:
                 self.logger.error(
-                    f"Fallback LogisticRegression fitting failed: {fallback_e}", exc_info=True
+                    f"Fallback LogisticRegression fitting failed: {fallback_e}",
+                    exc_info=True,
                 )
                 self._summary["fallback_error"] = str(fallback_e)
                 return self
@@ -102,9 +121,13 @@ class LogisticRegressionModel:
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if self.model is None:
-            raise RuntimeError("Model has not been fitted yet. Call fit() before predict().")
+            raise RuntimeError(
+                "Model has not been fitted yet. Call fit() before predict()."
+            )
         if self.X_columns is None:
-            raise RuntimeError("Model has not been fitted with column information. Call fit() first.")
+            raise RuntimeError(
+                "Model has not been fitted with column information. Call fit() first."
+            )
         return self.model.predict(X)
 
     def get_summary(self) -> Dict[str, Any]:
@@ -131,8 +154,8 @@ class LogisticRegressionModel:
         # Use average='weighted' for multiclass or if classes are imbalanced
         # Use average='binary' if strictly binary and want score for positive class
         metrics["f1_score"] = f1_score(
-                y_test, y_pred, average="weighted", zero_division=0
-            )
+            y_test, y_pred, average="weighted", zero_division=0
+        )
         self._summary = {
             "model_type": "logistic_regression",
             "scoring": self.scoring,

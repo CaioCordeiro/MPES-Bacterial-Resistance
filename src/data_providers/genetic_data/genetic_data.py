@@ -26,7 +26,7 @@ class GeneticDataset(DatasetInterface):
         self,
         sra_ids: Optional[List[str]] = None,
         exclude_ids: List[str] = const.EXCLUDE_LIST,
-        root_dir: str = '',
+        root_dir: str = "",
         raw_data_output: str = "data/raw_data",
         kmer_size: int = const.K_SIZE,
         feature_output: str = const.FEATURE_DIR,
@@ -60,20 +60,30 @@ class GeneticDataset(DatasetInterface):
             sra_ids if sra_ids is not None else self._get_sra_ids_from_relation_file()
         )
         self.exclude_ids = exclude_ids
-        self.raw_data_output_dir = os.path.join(self.root_dir, raw_data_output, self.bac_name)
+        self.raw_data_output_dir = os.path.join(
+            self.root_dir, raw_data_output, self.bac_name
+        )
         self.kmer_size = kmer_size
-        self.feature_output_dir = os.path.join(self.root_dir, feature_output, self.bac_name)
-        self.dataset_output_dir = os.path.join(self.root_dir, dataset_output, self.bac_name)
+        self.feature_output_dir = os.path.join(
+            self.root_dir, feature_output, self.bac_name
+        )
+        self.dataset_output_dir = os.path.join(
+            self.root_dir, dataset_output, self.bac_name
+        )
         # Read from output_dir if it exists
         if os.path.exists(self.dataset_output_dir):
             self.logger.info(f"Loading existing dataset from {self.dataset_output_dir}")
             # Read the bac.csv file (it only has one file)
-            filepath = os.path.join(self.dataset_output_dir, f"{self.bac_name}_dataset.csv")
+            filepath = os.path.join(
+                self.dataset_output_dir, f"{self.bac_name}_dataset.csv"
+            )
             if os.path.exists(filepath):
                 self.logger.info(f"Loading existing dataset from {filepath}")
                 self._treated_data = pd.read_csv(filepath)
             else:
-                self.logger.warning(f"File {filepath} does not exist. Creating new dataset.")
+                self.logger.warning(
+                    f"File {filepath} does not exist. Creating new dataset."
+                )
                 self._treated_data = None
         self.use_existing_files = True  # New option to use existing files
         create_folder(self.raw_data_output_dir)
@@ -118,7 +128,9 @@ class GeneticDataset(DatasetInterface):
 
         # Chack if we already have enough raw data directories with files
         raw_data_dirs = [
-            d for d in os.listdir(self.raw_data_output_dir) if os.path.isdir(os.path.join(self.raw_data_output_dir, d))
+            d
+            for d in os.listdir(self.raw_data_output_dir)
+            if os.path.isdir(os.path.join(self.raw_data_output_dir, d))
         ]
         if len(raw_data_dirs) >= (self.max_sra_ids or float("inf")):
             self.logger.debug(
@@ -153,7 +165,9 @@ class GeneticDataset(DatasetInterface):
             return
 
         self.logger.info("Extracting k-mer features...")
-        extractor = KmerExtractor(k_size=self.kmer_size, bac_name=self.bac_name, root_dir=self.root_dir)
+        extractor = KmerExtractor(
+            k_size=self.kmer_size, bac_name=self.bac_name, root_dir=self.root_dir
+        )
         extractor.process_sequences()
         self.logger.info("K-mer feature extraction finished.")
 

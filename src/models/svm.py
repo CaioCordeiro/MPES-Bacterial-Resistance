@@ -7,7 +7,15 @@ import numpy as np
 import pandas as pd
 import psutil
 from sklearn.metrics import (  # Regression metrics for SVR; Classification metrics for SVC
-    accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score, roc_auc_score, precision_recall_curve, auc)
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    mean_squared_error,
+    r2_score,
+    roc_auc_score,
+    precision_recall_curve,
+    auc,
+)
 from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold
 
 from sklearn.preprocessing import StandardScaler
@@ -34,7 +42,7 @@ class SupportVectorMachineModel:
         self,
         model_type: str = "svc",  # Default to Support Vector Classification
         param_grid: Dict[str, List] = None,
-        cv: int =  StratifiedKFold(n_splits=10, shuffle=True, random_state=42),
+        cv: int = StratifiedKFold(n_splits=10, shuffle=True, random_state=42),
         scoring: Optional[str] = None,  # Allow explicit scoring override
     ):
         if model_type not in ["svc", "svr"]:
@@ -90,7 +98,9 @@ class SupportVectorMachineModel:
         self._X = X  # Store the original X
         self._y = y  # Store the original y
         # Separate in train and test sets
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
         # Use GridSearchCV for hyperparameter tuning
         grid_search = GridSearchCV(
             estimator=self._get_model_instance(),
@@ -151,9 +161,7 @@ class SupportVectorMachineModel:
             # Should be caught in __init__, but for safety
             raise ValueError(f"Invalid model_type: {self.model_type}")
 
-    def cross_validate(
-        self, X: pd.DataFrame, y: pd.Series
-    ) -> Optional[np.ndarray]:
+    def cross_validate(self, X: pd.DataFrame, y: pd.Series) -> Optional[np.ndarray]:
         """
         Performs cross-validation on the *best* fitted model.
 
@@ -355,4 +363,3 @@ class SupportVectorMachineModel:
                 f"Feature importances (coefficients) are only available for kernel='linear'. Current kernel: {getattr(self.model, 'kernel', 'N/A')}."
             )
             return None
-
