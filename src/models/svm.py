@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import psutil
 from sklearn.metrics import (  # Regression metrics for SVR; Classification metrics for SVC
-    accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score)
+    accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score, roc_auc_score, precision_recall_curve, auc)
 from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold
 
 from sklearn.preprocessing import StandardScaler
@@ -234,6 +234,7 @@ class SupportVectorMachineModel:
         # --- Calculate Metrics Based on Model Type ---
         metrics = {}
         try:
+            # y_pred_proba = self.model.predict_proba(X_aligned)
             # Ensure y is suitable for classification metrics (e.g., integer labels)
             metrics["accuracy"] = accuracy_score(y_test, y_pred)
             # Use average='weighted' for multiclass or if classes are imbalanced
@@ -245,6 +246,9 @@ class SupportVectorMachineModel:
             # This is necessary for JSON serialization
             confusion_matrix_result = confusion_matrix(y_test, y_pred)
             metrics["confusion_matrix"] = confusion_matrix_result.tolist()
+            # metrics["roc_auc"] = roc_auc_score(y_test, y_pred_proba[:, 1])
+            # precision, recall, _ = precision_recall_curve(y_test, y_pred_proba[:, 1])
+            # metrics["pr_auc"] = auc(recall, precision)
 
         except Exception as e:
             self.logger.error(f"Failed to calculate SVC metrics: {e}")

@@ -64,7 +64,7 @@ class RReliefF(FeatureSelectionInterface):
 
         self.n_neighbors = n_neighbors
         self.n_features_to_select = n_features_to_select
-        self.n_iterations = 100
+        self.n_iterations = 1000
         self.random_state = random_state
         self.feature_scores_ = None
         self.feature_names_in_ = None

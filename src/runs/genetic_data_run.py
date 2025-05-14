@@ -4,6 +4,7 @@ import numpy as np  # Import numpy
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score
+from scipy.stats import ttest_1samp
 from sklearn.base import BaseEstimator, is_classifier, is_regressor
 from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -192,6 +193,49 @@ class GeneticDataRun:
             result_data["mean_cv_score"] = (
                 np.mean(scores) if scores is not None and len(scores) > 0 else None
             )
+            # Calculate p-value for cross-validation scores
+            if scores is not None and ((isinstance(scores, list) and len(scores) > 1) or \
+                                       (isinstance(scores, np.ndarray) and scores.size > 1)):
+                is_classification_model = getattr(self.model, 'model_type', None) in ['svc', 'logistic_regression']
+                is_relevant_scoring = getattr(self.model, 'scoring', '') in ['accuracy', 'f1_weighted', 'f1_macro', 'f1_micro', 'roc_auc']
+
+                if is_classification_model and is_relevant_scoring:
+                    try:
+                        baseline = 0.5 
+                        if len(target_y.unique()) > 2 and self.model.scoring == 'accuracy':
+                             baseline = 1.0 / len(target_y.unique())
+
+                        t_statistic, p_value = ttest_1samp(scores, baseline, alternative='greater')
+                        
+                        # Calculate degrees of freedom
+                        df = len(scores) - 1
+                        
+                        # Calculate confidence interval for the mean of the scores
+                        # Using a 95% confidence level by default
+                        confidence_level = 0.95
+                        mean_score = np.mean(scores)
+                        std_err = np.std(scores, ddof=1) / np.sqrt(len(scores)) # Standard error of the mean
+                        
+                        # Get the critical t-value for the confidence interval
+                        # For a one-sided test 'greater', we are interested in the lower bound primarily
+                        # but t.interval gives a two-sided interval.
+                        # For reporting, a two-sided CI around the mean_score is standard.
+                        ci_low, ci_high = ttest_1samp(scores, mean_score).confidence_interval(confidence_level)
+                        # If using older scipy, or for manual calculation:
+                        # from scipy.stats import t
+                        # ci_margin = t.ppf((1 + confidence_level) / 2., df) * std_err
+                        # ci_low, ci_high = mean_score - ci_margin, mean_score + ci_margin
+
+
+                        result_data["cv_score_p_value"] = p_value
+                        result_data["cv_score_t_statistic"] = t_statistic
+                        result_data["cv_score_degree_freedom"] = df
+                        result_data["cv_score_confidence_interval_low"] = ci_low
+                        result_data["cv_score_confidence_interval_high"] = ci_high
+                        self.logger.info(f"CV scores t-test (vs {baseline:.2f}, H1: scores > baseline): t={t_statistic:.2f}, p={p_value:.4g}")
+                    except Exception as e_ttest:
+                        self.logger.warning(f"Could not calculate p-value for CV scores: {e_ttest}")
+
             result_data["model_summary"] = model_summary
             result_data["best_params"] = best_params
             result_data["status"] = "Success"

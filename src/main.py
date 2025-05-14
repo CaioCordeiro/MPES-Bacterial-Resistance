@@ -91,8 +91,8 @@ def plot_metrics(results: List[Dict[str, Any]], bacteria: str, timestamp: str = 
         }
         for result in group_results:
             metrics_data["n_features"].append(result.get("n_features_requested"))
-            metrics_data["f1_score"].append(result.get("test_f1_score", 0))
-            metrics_data["accuracy"].append(result.get("test_accuracy", 0))
+            metrics_data["f1_score"].append(result.get("model_summary").get("f1_score", 0))
+            metrics_data["accuracy"].append(result.get("model_summary").get("test_accuracy", 0))
             metrics_data["scores"].append(
                 np.mean(result.get("scores", [])) if result.get("scores") else 0
             )

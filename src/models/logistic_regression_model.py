@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import psutil
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, roc_auc_score, precision_recall_curve, auc
 from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
@@ -118,12 +118,21 @@ class LogisticRegressionModel:
         return self._summary
 
     def _update_summary(self, X_test, y_test) -> None:
+        metrics = {}
         y_pred = self.model.predict(X_test)
-        metrics = {
-            "accuracy": accuracy_score(y_test, y_pred),
-            "f1_score": f1_score(y_test, y_pred, average="weighted", zero_division=0),
-            "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-        }
+        # y_pred_proba = self.model.predict_proba(X_test)
+        confusion_matrix_result = confusion_matrix(y_test, y_pred)
+        metrics["confusion_matrix"] = confusion_matrix_result.tolist()
+        # metrics["roc_auc"] = roc_auc_score(y_test, y_pred_proba[:, 1])
+        # precision, recall, _ = precision_recall_curve(y_test, y_pred_proba[:, 1])
+        # metrics["pr_auc"] = auc(recall, precision)
+        # Ensure y is suitable for classification metrics (e.g., integer labels)
+        metrics["accuracy"] = accuracy_score(y_test, y_pred)
+        # Use average='weighted' for multiclass or if classes are imbalanced
+        # Use average='binary' if strictly binary and want score for positive class
+        metrics["f1_score"] = f1_score(
+                y_test, y_pred, average="weighted", zero_division=0
+            )
         self._summary = {
             "model_type": "logistic_regression",
             "scoring": self.scoring,
